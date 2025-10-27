@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiệm Nước Tụi Mình · POS</title>
+  <title>Tiệm Nước Tụi Mình · POS + Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .modal-enter{opacity:0;transform:translateY(6px)}
@@ -18,7 +18,7 @@
         <span class="text-2xl">🧋</span>
         <div>
           <h1 class="text-lg font-bold">Tiệm Nước Tụi Mình · POS</h1>
-          <p class="text-xs text-gray-500">HTML + Tailwind · localStorage / Firebase</p>
+          <p class="text-xs text-gray-500">HTML + Tailwind · Firebase Realtime</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
@@ -29,7 +29,7 @@
           <option value="cashier">Thu ngân</option>
           <option value="admin">Quản lý</option>
         </select>
-        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset data</button>
+        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset đơn</button>
       </div>
     </div>
   </header>
@@ -115,8 +115,39 @@
       </section>
     </section>
 
-    <!-- ADMIN -->
+    <!-- ADMIN + DASHBOARD -->
     <section id="view-admin" class="hidden grid md:grid-cols-2 gap-6">
+      <!-- Dashboard card -->
+      <section class="bg-white rounded-2xl shadow-sm border p-5 md:col-span-2">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-gray-900">Dashboard (Realtime)</h2>
+          <span class="text-xs text-gray-500">Tự cập nhật</span>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="border rounded-xl p-4">
+            <p class="text-sm text-gray-500">Tổng đơn hàng</p>
+            <p id="kpiOrders" class="text-3xl font-bold">—</p>
+          </div>
+          <div class="border rounded-xl p-4">
+            <p class="text-sm text-gray-500">Dung lượng ước tính</p>
+            <p class="text-lg font-semibold"><span id="kpiStorage">—</span> <span class="text-xs text-gray-500">/ 1 GB</span></p>
+            <div class="mt-2 w-full bg-gray-100 rounded-full h-2"><div id="kpiStorageBar" class="h-2 rounded-full bg-emerald-500" style="width:0%"></div></div>
+            <p id="kpiStoragePct" class="text-xs text-gray-500 mt-1">0%</p>
+          </div>
+          <div class="border rounded-xl p-4">
+            <p class="text-sm text-gray-500">Thiết bị đang online</p>
+            <p id="kpiOnline" class="text-3xl font-bold">—</p>
+          </div>
+          <div class="border rounded-xl p-4">
+            <p class="text-sm text-gray-500">Ước tính tải xuống / tháng</p>
+            <p class="text-lg font-semibold"><span id="kpiBandwidth">—</span> <span class="text-xs text-gray-500">/ 10 GB</span></p>
+            <div class="mt-2 w-full bg-gray-100 rounded-full h-2"><div id="kpiBandwidthBar" class="h-2 rounded-full bg-indigo-500" style="width:0%"></div></div>
+            <p id="kpiBandwidthPct" class="text-xs text-gray-500 mt-1">0%</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Config card -->
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Cấu hình quán</h2>
         <label class="text-sm text-gray-700">Số lượng bàn</label>
@@ -165,6 +196,26 @@
       { id:'topping-thach', name:'+ Thạch trái cây', price:6000, category:'Topping' },
     ];
 
+    function money(n){ return n.toLocaleString('vi-VN')+'₫'; }
+    function now(){ return Date.now(); }
+    function newId(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
+    function calcPriority(items){ return items.reduce((s,it)=>s+it.qty,0); }
+
+    // chỉ giữ "bóng mờ" menu/tables để tải nhanh khi offline/mở lại
+    function loadStore(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return { menu: seedMenu, orders: [], tables: 20 };
+        const parsed = JSON.parse(raw);
+        return { menu: parsed.menu||seedMenu, orders: [], tables: parsed.tables||20 };
+      }catch{ return { menu: seedMenu, orders: [], tables: 20 }; }
+    }
+    function saveLocalOnly(){
+      const shadow = { menu: store.menu, orders: [], tables: store.tables };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(shadow));
+      if(bc) bc.postMessage({ type:'store:update', store: shadow });
+    }
+
     const els = {
       roleSelect: document.getElementById('roleSelect'),
       btnResetData: document.getElementById('btnResetData'),
@@ -203,28 +254,16 @@
       btnClosePay: document.getElementById('btnClosePay'),
       btnCancelPay: document.getElementById('btnCancelPay'),
       btnConfirmPay: document.getElementById('btnConfirmPay'),
+      // Dashboard
+      kpiOrders: document.getElementById('kpiOrders'),
+      kpiStorage: document.getElementById('kpiStorage'),
+      kpiStorageBar: document.getElementById('kpiStorageBar'),
+      kpiStoragePct: document.getElementById('kpiStoragePct'),
+      kpiOnline: document.getElementById('kpiOnline'),
+      kpiBandwidth: document.getElementById('kpiBandwidth'),
+      kpiBandwidthBar: document.getElementById('kpiBandwidthBar'),
+      kpiBandwidthPct: document.getElementById('kpiBandwidthPct'),
     };
-
-    function money(n){ return n.toLocaleString('vi-VN')+'₫'; }
-    function now(){ return Date.now(); }
-    function newId(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
-    function calcPriority(items){ return items.reduce((s,it)=>s+it.qty,0); }
-
-    function loadStore(){
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return { menu: seedMenu, orders: [], tables: 20 };
-        const parsed = JSON.parse(raw);
-        return { menu: parsed.menu||seedMenu, orders: parsed.orders||[], tables: parsed.tables||20 };
-      }catch{ return { menu: seedMenu, orders: [], tables: 20 }; }
-    }
-
-    // Khi dùng Firebase, chỉ lưu menu/tables vào local để tránh vòng lặp & nhấp nháy
-    function saveLocalOnly(){
-      const shadow = { menu: store.menu, orders: [], tables: store.tables };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(shadow));
-      if(bc) bc.postMessage({ type:'store:update', store: shadow });
-    }
 
     let store = loadStore();
     window.store = store;
@@ -234,12 +273,27 @@
     let tablePicking = 1;
     let viewingOrderId = null;
 
-    // Sync nội bộ tab
+    // BroadcastChannel sync trong cùng thiết bị
     const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('tiem_nuoc_tui_minh_sync') : null;
-    if(bc){ bc.addEventListener('message', e=>{ if(e?.data?.type==='store:update'){ store = {...store, ...e.data.store}; render(); } }); }
+    if(bc){
+      bc.addEventListener('message', e=>{
+        if(e?.data?.type==='store:update'){
+          store = { ...store, ...e.data.store };
+          render();
+        }
+      });
+    }
 
-    // Role từ URL / phiên
-    const urlRole = new URLSearchParams(location.search).get('role');
+    // Role từ URL/hash/path
+    const ROLES = ['staff','barista','server','cashier','admin'];
+    const qRole = new URLSearchParams(location.search).get('role');
+    const hRaw = location.hash.replace(/^#/, '');
+    const hRole = new URLSearchParams(hRaw).get('role') || hRaw;
+    const pRole = location.pathname.split('/').filter(Boolean).pop();
+    let urlRole = null;
+    for(const cand of [qRole,hRole,pRole]){
+      if(ROLES.includes(String(cand||'').toLowerCase())){ urlRole = cand.toLowerCase(); break; }
+    }
     if(urlRole) role = urlRole;
     try{ const savedRole = sessionStorage.getItem('tn_role'); if(savedRole) role = savedRole; }catch{}
     function persistRole(){ try{ sessionStorage.setItem('tn_role', role); }catch{} }
@@ -250,8 +304,9 @@
 
     function getQueues(){
       const notPaid = store.orders.filter(o=>o.status!=='paid');
-      const brewing = notPaid.filter(o=>['queued','brewing'].includes(o.status))
-        .sort((a,b)=> (b.priority-b.priority)||(a.createdAt-b.createdAt));
+      const brewing = notPaid
+        .filter(o=>['queued','brewing'].includes(o.status))
+        .sort((a,b)=> (b.priority - a.priority) || (a.createdAt - b.createdAt)); // đúng thứ tự ưu tiên
       const ready = notPaid.filter(o=>o.status==='ready').sort((a,b)=>a.createdAt-b.createdAt);
       const delivered = notPaid.filter(o=>o.status==='delivered').sort((a,b)=>a.createdAt-b.createdAt);
       return { brewing, ready, delivered, notPaid };
@@ -267,13 +322,14 @@
         });
         return;
       }
+      // Fallback local (offline)
       store.orders = store.orders.map(o=> o.id===orderId ? {...o, status, timeline:[...o.timeline,{status,ts:now()}]} : o);
       saveLocalOnly(); render();
     }
     function payOrder(orderId){ setStatus(orderId,'paid'); closePay(); }
 
     function resetData(){
-      if(!confirm('Xoá toàn bộ đơn hàng?')) return;
+      if(!confirm('Xoá toàn bộ đơn hàng trên cloud?')) return;
       cart = {};
       store.orders = [];
       if(window.firebaseApi?.ready){
@@ -306,6 +362,7 @@
         });
         return;
       }
+      // Fallback local
       store.orders.push(order); cart={}; saveLocalOnly(); alert(`Đã gửi đơn cho bàn ${tablePicking}`); render();
     }
 
@@ -514,44 +571,44 @@
       if(role==='server') renderServer();
       if(role==='cashier') renderCashier();
       if(role==='admin') renderAdmin();
-      // khi realtime bật: chỉ lưu menu/tables (tránh flicker)
+      // chỉ lưu bóng mờ (tránh vòng lặp/flicker khi realtime)
       saveLocalOnly();
     }
 
     // Events
     els.roleSelect.addEventListener('change', e=>setRole(e.target.value));
-    if(new URLSearchParams(location.search).get('role')){
-      els.roleSelect.setAttribute('disabled','disabled');
-      els.roleSelect.classList.add('opacity-60','cursor-not-allowed');
-    }
     els.btnResetData.addEventListener('click', resetData);
-
-    els.tableSelect.addEventListener('change', e=>{ tablePicking=Number(e.target.value); renderCart(); });
-    els.catFilter.addEventListener('change', ()=>renderStaff());
-    els.searchInput.addEventListener('input', ()=>renderStaff());
-    els.btnSubmitOrder.addEventListener('click', submitOrder);
-
-    els.tabByTable.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
-    els.tabByItem.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
-
-    [els.btnClosePay, els.btnCancelPay].forEach(b=>b.addEventListener('click', closePay));
-    els.btnConfirmPay.addEventListener('click', ()=>{ if(viewingOrderId) payOrder(viewingOrderId); });
-
-    els.btnSaveAdmin.addEventListener('click', ()=>{
+    els.tableSelect?.addEventListener('change', e=>{ tablePicking=Number(e.target.value); renderCart(); });
+    els.catFilter?.addEventListener('change', ()=>renderStaff());
+    els.searchInput?.addEventListener('input', ()=>renderStaff());
+    els.btnSubmitOrder?.addEventListener('click', submitOrder);
+    els.tabByTable?.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
+    els.tabByItem?.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
+    [els.btnClosePay, els.btnCancelPay].forEach(b=>b?.addEventListener('click', closePay));
+    els.btnConfirmPay?.addEventListener('click', ()=>{ if(viewingOrderId) payOrder(viewingOrderId); });
+    els.btnSaveAdmin?.addEventListener('click', async ()=>{
       try{
         const parsed = JSON.parse(els.menuTextarea.value);
         if(!Array.isArray(parsed)) throw new Error('Menu phải là mảng items');
-        store.menu = parsed; store.tables = Math.max(1, Number(els.tablesInput.value)||20);
-        alert('Đã lưu cấu hình'); render();
+        const newTables = Math.max(1, Number(els.tablesInput.value)||20);
+
+        if(window.firebaseApi?.ready){
+          const ok = await window.firebaseApi.updateConfig({ tables: newTables, menu: parsed });
+          if(!ok) return alert('Không thể lưu lên cloud. Kiểm tra Rules/Network.');
+          alert('Đã lưu cấu hình (cloud)'); // sẽ tự render qua subscribeConfig
+        }else{
+          store.menu = parsed; store.tables = newTables;
+          saveLocalOnly(); alert('Đã lưu cấu hình (local)'); render();
+        }
       }catch(e){ alert('Menu không hợp lệ: '+e.message); }
     });
 
     render();
   </script>
 
-  <!-- === FIREBASE (đã cấu hình) === -->
+  <!-- === FIREBASE (config + orders + presence + dashboard) === -->
   <script type="module">
-    // Cấu hình của bạn
+    // Thay bằng cấu hình của bạn nếu cần
     window.FIREBASE_CONFIG = {
       apiKey: "AIzaSyC5g01aNIwU6Ysa5zsW2ahBmR_wiAHSc-0",
       authDomain: "tiem-nuoc-tui-minh.firebaseapp.com",
@@ -561,14 +618,17 @@
     };
 
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
-    import { getDatabase, ref, onValue, push, set, update } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
+    import {
+      getDatabase, ref, onValue, push, set, update, onDisconnect, serverTimestamp, get
+    } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
 
     const hasConfig = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
 
     const firebaseApi = {
-      app:null, db:null, auth:null, user:null, ordersRef:null, ready:false,
-      lastHash:null, // để tránh render lặp
+      app:null, db:null, auth:null, user:null,
+      ordersRef:null, configRef:null, ready:false,
+      lastOrdersHash:null,
       async init(){
         if(!hasConfig){ console.info('[Firebase] No config → local only'); return; }
         try{
@@ -576,32 +636,106 @@
           this.db = getDatabase(this.app);
           this.auth = getAuth(this.app);
           await signInAnonymously(this.auth);
-          onAuthStateChanged(this.auth,(u)=>{ this.user=u||null; });
+          onAuthStateChanged(this.auth,(u)=>{ this.user=u||null; if(u) this.setPresence(u.uid); });
+
           this.ordersRef = ref(this.db,'orders');
+          this.configRef = ref(this.db,'config');
           this.ready = true;
           console.info('[Firebase] READY');
+
+          // Đảm bảo có config mặc định nếu chưa tồn tại
+          try{
+            const snap = await get(this.configRef);
+            if(!snap.exists()){
+              await set(this.configRef, {
+                tables: 20,
+                menu: [
+                  { id:'mt-truyen-thong', name:'Trà sữa truyền thống', price:32000, category:'Milk Tea' },
+                  { id:'mt-matcha', name:'Matcha sữa', price:38000, category:'Milk Tea' },
+                  { id:'mt-olong', name:'Oolong sữa', price:36000, category:'Milk Tea' },
+                  { id:'tea-dao', name:'Hồng trà đào', price:35000, category:'Tea' },
+                  { id:'tea-vai', name:'Trà vải', price:35000, category:'Tea' },
+                  { id:'macchiato-oolong', name:'Oolong macchiato', price:42000, category:'Cheese' },
+                  { id:'yq-sugarcane', name:'Nước mía tắc', price:25000, category:'Fresh' },
+                  { id:'topping-tranchau', name:'+ Trân châu', price:5000, category:'Topping' },
+                  { id:'topping-thach', name:'+ Thạch trái cây', price:6000, category:'Topping' },
+                ],
+                updatedAt: serverTimestamp()
+              });
+            }
+          }catch(e){ console.warn('Ensure default config error:', e); }
         }catch(err){
           console.error('[Firebase] init error:',err);
           this.ready=false;
         }
       },
+      setPresence(uid){
+        try{
+          const pRef = ref(this.db, `presence/${uid}`);
+          onDisconnect(pRef).remove();
+          set(pRef, { online: true, ts: serverTimestamp() });
+          onValue(ref(this.db,'presence'), (snap)=>{
+            const val = snap.val() || {};
+            const online = Object.keys(val).length;
+            const el = document.getElementById('kpiOnline');
+            if(el) el.textContent = String(online);
+          });
+        }catch(e){ console.error('presence error', e); }
+      },
+      // Orders realtime
       subscribeOrders(cb){
         if(!this.ready) return;
         onValue(this.ordersRef,(snap)=>{
           const val = snap.val() || {};
           const arr = Object.entries(val).map(([id,data])=>({id,...data}))
             .sort((a,b)=>a.createdAt-b.createdAt);
-          const h = JSON.stringify(arr.map(o=>[o.id,o.status,o.timeline?.length||0]));
-          if(h!==this.lastHash){ this.lastHash=h; cb(arr); } // chỉ render khi khác
+          const h = JSON.stringify(arr.map(o=>[o.id,o.status,o.timeline?.length||0,o.items?.length||0]));
+          if(h!==this.lastOrdersHash){ this.lastOrdersHash=h; cb(arr); this.updateDashboard(arr); }
         });
+      },
+      // Config realtime (menu/tables)
+      subscribeConfig(cb){
+        if(!this.ready) return;
+        onValue(this.configRef,(snap)=>{
+          const val = snap.val();
+          if(!val) return;
+          cb({ tables: val.tables, menu: val.menu });
+        });
+      },
+      updateDashboard(arr){
+        // KPI: tổng đơn
+        const total = arr.length;
+        const elOrders = document.getElementById('kpiOrders');
+        if(elOrders) elOrders.textContent = String(total);
+
+        // Ước tính dung lượng (tổng bytes JSON)
+        const enc = new TextEncoder();
+        let bytes = 0;
+        for(const o of arr){ bytes += enc.encode(JSON.stringify(o)).length; }
+        const MB = (bytes/(1024*1024)).toFixed(2);
+        const pct = Math.min(100, (bytes/(1024*1024*1024))*100);
+        const elSt = document.getElementById('kpiStorage');
+        const elBar = document.getElementById('kpiStorageBar');
+        const elPct = document.getElementById('kpiStoragePct');
+        if(elSt) elSt.textContent = MB + ' MB';
+        if(elBar) elBar.style.width = pct.toFixed(1) + '%';
+        if(elPct) elPct.textContent = pct.toFixed(1) + '%';
+
+        // Ước tính băng thông / tháng (gần đúng): tải toàn bộ mảng đơn ~5 lần/tháng
+        const assumedReadsPerMonth = 5;
+        const downGB = (bytes*assumedReadsPerMonth)/(1024*1024*1024);
+        const downPct = Math.min(100, (downGB/10)*100);
+        const elBw = document.getElementById('kpiBandwidth');
+        const elBwBar = document.getElementById('kpiBandwidthBar');
+        const elBwPct = document.getElementById('kpiBandwidthPct');
+        if(elBw) elBw.textContent = downGB.toFixed(2) + ' GB';
+        if(elBwBar) elBwBar.style.width = downPct.toFixed(1) + '%';
+        if(elBwPct) elBwPct.textContent = downPct.toFixed(1) + '%';
       },
       async pushOrder(order){
         if(!this.ready) return false;
-        try{
-          const r = push(this.ordersRef);
-          await set(r,{...order,id:r.key});
-          return true;
-        }catch(e){ console.error(e); return false; }
+        try{ const r = push(this.ordersRef); await set(r,{...order,id:r.key}); return true; }
+        catch(e){ console.error(e); return false; }
       },
       async updateStatus(orderId,status,timeline){
         if(!this.ready) return false;
@@ -610,8 +744,19 @@
       },
       async clearAllOrders(){
         if(!this.ready) return false;
-        try{ await set(this.ordersRef,null); this.lastHash=null; return true; }
+        try{ await set(this.ordersRef,null); this.lastOrdersHash=null; return true; }
         catch(e){ console.error(e); return false; }
+      },
+      async updateConfig({ tables, menu }){
+        if(!this.ready) return false;
+        try{
+          await update(this.configRef, {
+            ...(typeof tables==='number' ? { tables } : {}),
+            ...(Array.isArray(menu) ? { menu } : {}),
+            updatedAt: serverTimestamp()
+          });
+          return true;
+        }catch(e){ console.error('updateConfig error', e); return false; }
       }
     };
 
@@ -620,9 +765,19 @@
     (async()=>{
       await firebaseApi.init();
       if(firebaseApi.ready){
+        // Orders realtime
         firebaseApi.subscribeOrders((orders)=>{
           try{
             window.store.orders = orders;
+            if(typeof window.render === 'function') window.render();
+          }catch(e){ console.error(e); }
+        });
+
+        // Config realtime (menu/tables)
+        firebaseApi.subscribeConfig(({tables, menu})=>{
+          try{
+            if(typeof tables==='number') window.store.tables = tables;
+            if(Array.isArray(menu)) window.store.menu = menu;
             if(typeof window.render === 'function') window.render();
           }catch(e){ console.error(e); }
         });
