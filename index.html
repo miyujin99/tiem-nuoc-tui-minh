@@ -386,53 +386,71 @@
       els.roleSelect.value = role;
     }
 
-    function renderStaff(){
-      els.tableSelect.innerHTML = Array.from({length:store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
-      els.tableSelect.value = String(tablePicking);
-      els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
+ function renderStaff(){
+  // —— BÀN
+  els.tableSelect.innerHTML = Array.from({length: store.tables})
+    .map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
+  els.tableSelect.value = String(tablePicking);
+  els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
 
-      const cats = ['All',...new Set(store.menu.map(m=>m.category))];
-      els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  // —— CATEGORY (GIỮ LẠI LỰA CHỌN)
+  const prevCat = els.catFilter.value || 'All';        // lưu lại trước khi thay options
+  const cats = ['All', ...new Set(store.menu.map(m=>m.category))];
+  els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  els.catFilter.value = cats.includes(prevCat) ? prevCat : 'All';  // khôi phục lựa chọn
 
-      const kw = (els.searchInput.value||'').toLowerCase();
-      const cat = els.catFilter.value || 'All';
-      const list = store.menu.filter(m => (cat==='All'||m.category===cat) && (!kw||m.name.toLowerCase().includes(kw)));
+  // —— LỌC & TÌM KIẾM
+  const kw = (els.searchInput.value||'').toLowerCase();
+  const cat = els.catFilter.value || 'All';
+  const list = store.menu.filter(m =>
+    (cat==='All' || m.category===cat) &&
+    (!kw || m.name.toLowerCase().includes(kw))
+  );
 
-      els.menuGrid.innerHTML = list.map(m=>`
-        <div class="border rounded-xl p-4 hover:shadow-sm">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="font-semibold text-gray-900">${m.name}</h3>
-              <p class="text-sm text-gray-500">${m.category}</p>
-            </div>
-            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${money(m.price)}</span>
-          </div>
-          <div class="mt-3 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button data-dec="${m.id}" class="px-2 py-1 border rounded">-</button>
-              <span class="w-8 text-center">${cart[m.id]||0}</span>
-              <button data-inc="${m.id}" class="px-2 py-1 border rounded">+</button>
-            </div>
-            <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
-          </div>
-        </div>`).join('');
+  // —— HIỂN THỊ MENU
+  els.menuGrid.innerHTML = list.map(m=>`
+    <div class="border rounded-xl p-4 hover:shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="font-semibold text-gray-900">${m.name}</h3>
+          <p class="text-sm text-gray-500">${m.category}</p>
+        </div>
+        <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">
+          ${money(m.price)}
+        </span>
+      </div>
+      <div class="mt-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <button data-dec="${m.id}" class="px-2 py-1 border rounded">-</button>
+          <span class="w-8 text-center">${cart[m.id]||0}</span>
+          <button data-inc="${m.id}" class="px-2 py-1 border rounded">+</button>
+        </div>
+        <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
+      </div>
+    </div>
+  `).join('');
 
-      els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc'))));
-      els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec'))));
-      els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-add'))));
+  // gắn sự kiện +/-
+  els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc'))));
+  els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec'))));
+  els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-add'))));
 
-      renderCart();
+  // giỏ hàng
+  renderCart();
 
-      const listRecent = store.orders.filter(o=>o.status!=='paid').sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
-      els.recentOrders.innerHTML = listRecent.map(o=>`
-        <div class="flex items-center justify-between border rounded-lg p-3">
-          <div>
-            <p class="font-medium">Bàn ${o.table}</p>
-            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
-          </div>
-          <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
-        </div>`).join('');
-    }
+  // đơn gần đây
+  const listRecent = store.orders.filter(o=>o.status!=='paid')
+    .sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
+  els.recentOrders.innerHTML = listRecent.map(o=>`
+    <div class="flex items-center justify-between border rounded-lg p-3">
+      <div>
+        <p class="font-medium">Bàn ${o.table}</p>
+        <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
+      </div>
+      <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
+    </div>
+  `).join('');
+}
 
     function renderCart(){
       const entries = Object.entries(cart);
