@@ -18,26 +18,11 @@
         <span class="text-2xl">🧋</span>
         <div>
           <h1 class="text-lg font-bold">Tiệm Nước Tụi Mình · POS</h1>
-          <p class="text-xs text-gray-500">HTML + Tailwind · localStorage</p>
+          <p class="text-xs text-gray-500">HTML + Tailwind · localStorage / Firebase-ready</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <div id="authInfo" class="hidden items-center gap-2"></div>
         <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò (demo)">
-          <option value="staff">Nhân viên (Gọi món)</option>
-          <option value="barista">Quầy pha chế</option>
-          <option value="server">Nhân viên giao bàn</option>
-          <option value="cashier">Thu ngân</option>
-          <option value="admin">Quản lý</option>
-        </select>
-        <button id="btnLogin" class="text-sm px-3 py-2 border rounded-lg">Đăng nhập</button>
-        <button id="btnLogout" class="hidden text-sm px-3 py-2 border rounded-lg">Đăng xuất</button>
-        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset data</button>
-      </div>
-    </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò">
           <option value="staff">Nhân viên (Gọi món)</option>
           <option value="barista">Quầy pha chế</option>
           <option value="server">Nhân viên giao bàn</option>
@@ -48,31 +33,6 @@
       </div>
     </div>
   </header>
-
-  <!-- Auth Modal -->
-  <div id="authModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-2xl w-full max-w-md p-5 modal-enter">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold">Đăng nhập</h3>
-        <button id="btnAuthClose" class="text-gray-500 hover:text-gray-700">✕</button>
-      </div>
-      <div class="space-y-3">
-        <div>
-          <label class="text-sm text-gray-700">Tên đăng nhập</label>
-          <input id="authUser" class="mt-1 w-full border rounded-lg px-3 py-2" placeholder="ví dụ: admin" />
-        </div>
-        <div>
-          <label class="text-sm text-gray-700">Mật khẩu</label>
-          <input id="authPass" type="password" class="mt-1 w-full border rounded-lg px-3 py-2" placeholder="••••••" />
-        </div>
-        <p class="text-xs text-gray-500">Demo tài khoản: <span class="font-mono">admin/1234</span>, <span class="font-mono">staff1/1234</span>, <span class="font-mono">bar1/1234</span>, <span class="font-mono">server1/1234</span>, <span class="font-mono">cash1/1234</span></p>
-      </div>
-      <div class="mt-4 flex justify-end gap-2">
-        <button id="btnAuthCancel" class="px-4 py-2 rounded-lg border">Huỷ</button>
-        <button id="btnAuthLogin" class="px-4 py-2 rounded-lg bg-black text-white">Đăng nhập</button>
-      </div>
-    </div>
-  </div>
 
   <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
     <!-- STAFF VIEW -->
@@ -266,6 +226,7 @@
     };
 
     let store = loadStore();
+    window.store = store; // expose for Firebase module
     let cart = {}; // {menuItemId: qty}
     let role = 'staff';
     let baristaTab = 'by-table';
@@ -288,9 +249,7 @@
     const urlRole = new URLSearchParams(location.search).get('role');
     if(urlRole){ role = urlRole; }
     try{ const savedRole = sessionStorage.getItem('tn_role'); if(savedRole) role = savedRole; }catch{}
-
     function persistRole(){ try{ sessionStorage.setItem('tn_role', role); }catch{} }
-
 
     // ---------- helpers ----------
     function setRole(r){ role = r; persistRole(); render(); }
@@ -323,8 +282,6 @@
         o.id === orderId ? { ...o, status, timeline: [...o.timeline, { status, ts: now() }] } : o
       );
       saveStore(); render();
-    }]} : o);
-      saveStore(); render();
     }
     function payOrder(orderId){ setStatus(orderId, 'paid'); closePay(); }
 
@@ -341,18 +298,9 @@
           return mi && qty > 0 ? { menuItemId: id, name: mi.name, price: mi.price, qty } : null;
         })
         .filter(Boolean);
+      if (items.length === 0) return alert('Giỏ hàng trống');
 
-      if (items.length === 0) return alert("Giỏ hàng trống");
-
-      const order = {
-        id: newId("ord"),
-        table: tablePicking,
-        items,
-        priority: calcPriority(items),
-        createdAt: now(),
-        status: "queued",
-        timeline: [{ status: "queued", ts: now() }],
-      };
+      const order = { id: newId('ord'), table: tablePicking, items, priority: calcPriority(items), createdAt: now(), status:'queued', timeline:[{status:'queued', ts: now()}] };
 
       if (window.firebaseApi && window.firebaseApi.ready) {
         window.firebaseApi.pushOrder(order).then((ok)=>{
@@ -362,13 +310,7 @@
         });
         return;
       }
-
-      store.orders.push(order);
-      cart = {}; saveStore(); alert(`Đã gửi đơn cho bàn ${tablePicking}`); render();
-    } : null;
-      }).filter(Boolean);
-      if(items.length===0) return alert('Giỏ hàng trống');
-      const order = { id: newId('ord'), table: tablePicking, items, priority: calcPriority(items), createdAt: now(), status:'queued', timeline:[{status:'queued', ts: now()}] };
+      // Fallback local
       store.orders.push(order); cart = {}; saveStore(); alert('Đã gửi đơn cho bàn '+tablePicking); render();
     }
 
@@ -399,16 +341,13 @@
     }
 
     function renderStaff(){
-      // table select
       els.tableSelect.innerHTML = Array.from({length: store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
       els.tableSelect.value = String(tablePicking);
       els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
 
-      // categories
-      const cats = ['All', ...Array.from(new Set(store.menu.map(m=>m.category)))];
+      const cats = ['All', ...Array.from(new Set(store.menu.map(m=>m.category)) )];
       els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
 
-      // menu grid
       const kw = (els.searchInput.value||'').toLowerCase();
       const cat = els.catFilter.value || 'All';
       const list = store.menu.filter(m=> (cat==='All'||m.category===cat) && (!kw||m.name.toLowerCase().includes(kw)) );
@@ -437,7 +376,7 @@
       els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-add'))));
 
       renderCart();
-      // recent orders
+
       const listRecent = store.orders.filter(o=>o.status!=='paid').sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
       els.recentOrders.innerHTML = listRecent.map(o=>`
         <div class="flex items-center justify-between border rounded-lg p-3">
@@ -471,22 +410,18 @@
       els.cartList.querySelectorAll('[data-dec-cart]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec-cart'))));
       els.cartList.querySelectorAll('[data-inc-cart]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc-cart'))));
 
-      const total = entries.reduce((t,[id,qty])=>{
-        const mi = store.menu.find(m=>m.id===id); return t + (mi?mi.price*qty:0);
-      },0);
+      const total = entries.reduce((t,[id,qty])=>{ const mi = store.menu.find(m=>m.id===id); return t + (mi?mi.price*qty:0); },0);
       els.cartTotal.textContent = money(total);
       els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
     }
 
     function renderBarista(){
-      // tab state
       els.tabByTable.classList.toggle('bg-black', baristaTab==='by-table');
       els.tabByTable.classList.toggle('text-white', baristaTab==='by-table');
       els.tabByItem.classList.toggle('bg-black', baristaTab==='by-item');
       els.tabByItem.classList.toggle('text-white', baristaTab==='by-item');
 
       const { brewing } = getQueues();
-      // by table
       const group = new Map();
       brewing.forEach(o=>{ const arr = group.get(o.table)||[]; arr.push(o); group.set(o.table, arr); });
       const entries = Array.from(group.entries()).sort((a,b)=>a[0]-b[0]);
@@ -518,7 +453,6 @@
       els.baristaByTable.querySelectorAll('[data-start]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-start'),'brewing')));
       els.baristaByTable.querySelectorAll('[data-ready]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-ready'),'ready')));
 
-      // by item
       const agg = new Map();
       brewing.forEach(o=>o.items.forEach(it=>{ const v = agg.get(it.menuItemId)||{name:it.name,totalQty:0}; v.totalQty += it.qty; agg.set(it.menuItemId, v);}));
       const rows = Array.from(agg.entries()).map(([id,v])=>({id,name:v.name,totalQty:v.totalQty}));
@@ -597,6 +531,8 @@
     }
 
     function render(){
+      window.store = store; // keep globals in sync for Firebase module
+      window.render = render;
       renderRole();
       if(role==='staff') renderStaff();
       if(role==='barista') renderBarista();
@@ -645,16 +581,14 @@
 
   <!-- === FIREBASE READY (paste your config) === -->
   <script type="module">
-    // 1) DÁN cấu hình Firebase của bạn vào đây (thay thế các giá trị "PASTE_...")
-    //    Hướng dẫn lấy cấu hình: Firebase Console → Project settings → Your apps (Web) → SDK setup
+    // DÁN cấu hình Firebase của bạn vào đây (thay các giá trị "PASTE_...")
     window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyC5g01aNIwU6Ysa5zsW2ahBmR_wiAHSc-0",
-  authDomain: "tiem-nuoc-tui-minh.firebaseapp.com",
-  databaseURL: "https://tiem-nuoc-tui-minh-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "tiem-nuoc-tui-minh",
-  appId: "1:599673062211:web:2ac6b038d1b17c6130a5f6"
-};
-
+      apiKey: "PASTE_API_KEY",
+      authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://PASTE_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "PASTE_PROJECT_ID",
+      appId: "PASTE_APP_ID"
+    };
 
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
     import { getDatabase, ref, onValue, push, set, update } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
@@ -709,12 +643,10 @@
 
     window.firebaseApi = firebaseApi;
 
-    // Tự khởi tạo và đăng ký lắng nghe nếu có cấu hình
     (async () => {
       await firebaseApi.init();
       if(firebaseApi.ready){
         firebaseApi.subscribeOrders((ordersFromCloud)=>{
-          // đồng bộ vào store hiện tại
           try{
             window.store.orders = ordersFromCloud;
             if(typeof window.render === 'function') window.render();
