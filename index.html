@@ -433,7 +433,14 @@
   // gắn sự kiện +/-
   els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc'))));
   els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec'))));
-  els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-add'))));
+  // Khi bấm nút “Thêm”, chỉ đảm bảo món được thêm vào giỏ (nếu chưa có),
+// KHÔNG cộng thêm 1 nếu người dùng đã chỉnh bằng nút +/-
+els.menuGrid.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', e => {
+  const id = e.target.getAttribute('data-add');
+  if (!cart[id]) cart[id] = 1; // chỉ thêm 1 nếu món chưa có
+  renderCart();
+}));
+
 
   // giỏ hàng
   renderCart();
