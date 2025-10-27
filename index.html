@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiệm Nước Tụi Mình · POS (HTML Prototype)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .modal-enter { opacity: 0; transform: translateY(6px); }
+    .modal-enter-active { opacity: 1; transform: translateY(0); transition: all .15s ease; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🧋</span>
+        <div>
+          <h1 class="text-lg font-bold">Tiệm Nước Tụi Mình · POS</h1>
+          <p class="text-xs text-gray-500">HTML + Tailwind · localStorage</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="authInfo" class="hidden items-center gap-2"></div>
+        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò (demo)">
+          <option value="staff">Nhân viên (Gọi món)</option>
+          <option value="barista">Quầy pha chế</option>
+          <option value="server">Nhân viên giao bàn</option>
+          <option value="cashier">Thu ngân</option>
+          <option value="admin">Quản lý</option>
+        </select>
+        <button id="btnLogin" class="text-sm px-3 py-2 border rounded-lg">Đăng nhập</button>
+        <button id="btnLogout" class="hidden text-sm px-3 py-2 border rounded-lg">Đăng xuất</button>
+        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset data</button>
+      </div>
+    </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò">
+          <option value="staff">Nhân viên (Gọi món)</option>
+          <option value="barista">Quầy pha chế</option>
+          <option value="server">Nhân viên giao bàn</option>
+          <option value="cashier">Thu ngân</option>
+          <option value="admin">Quản lý</option>
+        </select>
+        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset data</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Auth Modal -->
+  <div id="authModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md p-5 modal-enter">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold">Đăng nhập</h3>
+        <button id="btnAuthClose" class="text-gray-500 hover:text-gray-700">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm text-gray-700">Tên đăng nhập</label>
+          <input id="authUser" class="mt-1 w-full border rounded-lg px-3 py-2" placeholder="ví dụ: admin" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-700">Mật khẩu</label>
+          <input id="authPass" type="password" class="mt-1 w-full border rounded-lg px-3 py-2" placeholder="••••••" />
+        </div>
+        <p class="text-xs text-gray-500">Demo tài khoản: <span class="font-mono">admin/1234</span>, <span class="font-mono">staff1/1234</span>, <span class="font-mono">bar1/1234</span>, <span class="font-mono">server1/1234</span>, <span class="font-mono">cash1/1234</span></p>
+      </div>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="btnAuthCancel" class="px-4 py-2 rounded-lg border">Huỷ</button>
+        <button id="btnAuthLogin" class="px-4 py-2 rounded-lg bg-black text-white">Đăng nhập</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <!-- STAFF VIEW -->
+    <section id="view-staff" class="hidden">
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="md:col-span-2 space-y-4">
+          <section class="bg-white rounded-2xl shadow-sm border p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xl font-semibold text-gray-900">Chọn bàn & Menu</h2>
+              <div class="flex items-center gap-3">
+                <select id="tableSelect" class="border rounded-lg px-3 py-2 text-sm"></select>
+                <select id="catFilter" class="border rounded-lg px-3 py-2 text-sm"></select>
+                <input id="searchInput" class="border rounded-lg px-3 py-2 text-sm w-48" placeholder="Tìm món..." />
+              </div>
+            </div>
+            <div id="menuGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+          </section>
+        </div>
+        <div class="space-y-4">
+          <section class="bg-white rounded-2xl shadow-sm border p-5">
+            <h2 id="cartTitle" class="text-xl font-semibold text-gray-900 mb-3">Giỏ hàng</h2>
+            <div id="cartList" class="space-y-3 text-sm text-gray-700">Chưa có món.</div>
+            <div class="pt-3 mt-2 border-t flex items-center justify-between">
+              <span class="font-semibold">Tổng</span>
+              <span id="cartTotal" class="font-bold">0₫</span>
+            </div>
+            <button id="btnSubmitOrder" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 mt-3">Gửi order đến quầy pha chế</button>
+          </section>
+          <section class="bg-white rounded-2xl shadow-sm border p-5">
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Đơn gần đây (chưa thanh toán)</h2>
+            <div id="recentOrders" class="space-y-2 max-h-80 overflow-auto pr-1"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- BARISTA VIEW -->
+    <section id="view-barista" class="hidden space-y-4">
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-gray-900">Hàng đợi pha chế</h2>
+          <div class="flex items-center gap-2 text-sm">
+            <button id="tabByTable" class="px-3 py-1 rounded-lg border">Xem theo bàn</button>
+            <button id="tabByItem" class="px-3 py-1 rounded-lg border">Xem tổng món</button>
+          </div>
+        </div>
+        <div id="baristaByTable" class="grid md:grid-cols-2 gap-4"></div>
+        <div id="baristaByItem" class="grid md:grid-cols-3 gap-4 hidden"></div>
+      </section>
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">Đã sẵn sàng giao</h2>
+        <p class="text-sm text-gray-500">Chuyển sang vai trò "Nhân viên giao bàn" để xử lý giao món.</p>
+      </section>
+    </section>
+
+    <!-- SERVER VIEW -->
+    <section id="view-server" class="hidden grid md:grid-cols-2 gap-6">
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Món đã sẵn sàng</h2>
+        <div id="readyList" class="space-y-3"></div>
+      </section>
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Đã giao · chờ thanh toán</h2>
+        <div id="deliveredList" class="space-y-3"></div>
+      </section>
+    </section>
+
+    <!-- CASHIER VIEW -->
+    <section id="view-cashier" class="hidden space-y-4">
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Chờ thanh toán</h2>
+        <div id="cashierNotPaid" class="space-y-3"></div>
+      </section>
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xl font-semibold text-gray-900">Đã thanh toán hôm nay</h2>
+          <span id="cashierTotalToday" class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700"></span>
+        </div>
+        <div id="cashierPaid" class="grid md:grid-cols-2 gap-3"></div>
+      </section>
+    </section>
+
+    <!-- ADMIN VIEW -->
+    <section id="view-admin" class="hidden grid md:grid-cols-2 gap-6">
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Cấu hình quán</h2>
+        <label class="text-sm text-gray-700">Số lượng bàn</label>
+        <input id="tablesInput" type="number" min="1" class="border rounded-lg px-3 py-2 w-40" />
+      </section>
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Menu (JSON)</h2>
+        <textarea id="menuTextarea" class="w-full h-80 border rounded-xl p-3 font-mono text-sm"></textarea>
+        <div class="mt-3">
+          <button id="btnSaveAdmin" class="px-4 py-2 rounded-lg bg-black text-white">Lưu thay đổi</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Pay Modal -->
+  <div id="payModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg p-5 modal-enter">
+      <div class="flex items-center justify-between mb-2">
+        <h3 id="payTitle" class="text-lg font-semibold">Thanh toán</h3>
+        <button id="btnClosePay" class="text-gray-500 hover:text-gray-700">✕</button>
+      </div>
+      <div id="payLines" class="space-y-2"></div>
+      <div class="pt-2 mt-2 border-t flex items-center justify-between">
+        <span class="font-semibold">Tổng</span>
+        <span id="payTotal" class="font-bold">0₫</span>
+      </div>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="btnCancelPay" class="px-4 py-2 rounded-lg border">Đóng</button>
+        <button id="btnConfirmPay" class="px-4 py-2 rounded-lg bg-emerald-600 text-white">Xác nhận thanh toán</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'tiemnuoctuiminh_pos_v1_html';
+    const seedMenu = [
+      { id: 'mt-truyen-thong', name: 'Trà sữa truyền thống', price: 32000, category: 'Milk Tea' },
+      { id: 'mt-matcha', name: 'Matcha sữa', price: 38000, category: 'Milk Tea' },
+      { id: 'mt-olong', name: 'Oolong sữa', price: 36000, category: 'Milk Tea' },
+      { id: 'tea-dao', name: 'Hồng trà đào', price: 35000, category: 'Tea' },
+      { id: 'tea-vai', name: 'Trà vải', price: 35000, category: 'Tea' },
+      { id: 'macchiato-oolong', name: 'Oolong macchiato', price: 42000, category: 'Cheese' },
+      { id: 'yq-sugarcane', name: 'Nước mía tắc', price: 25000, category: 'Fresh' },
+      { id: 'topping-tranchau', name: '+ Trân châu', price: 5000, category: 'Topping' },
+      { id: 'topping-thach', name: '+ Thạch trái cây', price: 6000, category: 'Topping' },
+    ];
+
+    function money(n){ return n.toLocaleString('vi-VN') + '₫'; }
+    function now(){ return Date.now(); }
+    function newId(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+    function calcPriority(items){ return items.reduce((s,it)=>s+it.qty,0); }
+
+    function loadStore(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return { menu: seedMenu, orders: [], tables: 20 };
+        return JSON.parse(raw);
+      }catch(e){ return { menu: seedMenu, orders: [], tables: 20 }; }
+    }
+    function saveStore(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); bcPost(); }
+
+    const els = {
+      roleSelect: document.getElementById('roleSelect'),
+      btnResetData: document.getElementById('btnResetData'),
+      views: {
+        staff: document.getElementById('view-staff'),
+        barista: document.getElementById('view-barista'),
+        server: document.getElementById('view-server'),
+        cashier: document.getElementById('view-cashier'),
+        admin: document.getElementById('view-admin'),
+      },
+      // staff
+      tableSelect: document.getElementById('tableSelect'),
+      catFilter: document.getElementById('catFilter'),
+      searchInput: document.getElementById('searchInput'),
+      menuGrid: document.getElementById('menuGrid'),
+      cartTitle: document.getElementById('cartTitle'),
+      cartList: document.getElementById('cartList'),
+      cartTotal: document.getElementById('cartTotal'),
+      btnSubmitOrder: document.getElementById('btnSubmitOrder'),
+      recentOrders: document.getElementById('recentOrders'),
+      // barista
+      tabByTable: document.getElementById('tabByTable'),
+      tabByItem: document.getElementById('tabByItem'),
+      baristaByTable: document.getElementById('baristaByTable'),
+      baristaByItem: document.getElementById('baristaByItem'),
+      // server
+      readyList: document.getElementById('readyList'),
+      deliveredList: document.getElementById('deliveredList'),
+      // cashier
+      cashierNotPaid: document.getElementById('cashierNotPaid'),
+      cashierPaid: document.getElementById('cashierPaid'),
+      cashierTotalToday: document.getElementById('cashierTotalToday'),
+      // admin
+      tablesInput: document.getElementById('tablesInput'),
+      menuTextarea: document.getElementById('menuTextarea'),
+      btnSaveAdmin: document.getElementById('btnSaveAdmin'),
+      // modal
+      payModal: document.getElementById('payModal'),
+      payTitle: document.getElementById('payTitle'),
+      payLines: document.getElementById('payLines'),
+      payTotal: document.getElementById('payTotal'),
+      btnClosePay: document.getElementById('btnClosePay'),
+      btnCancelPay: document.getElementById('btnCancelPay'),
+      btnConfirmPay: document.getElementById('btnConfirmPay'),
+    };
+
+    let store = loadStore();
+    let cart = {}; // {menuItemId: qty}
+    let role = 'staff';
+    let baristaTab = 'by-table';
+    let tablePicking = 1;
+    let viewingOrderId = null;
+
+    // --- Multi-tab sync (same device) via BroadcastChannel ---
+    const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('tiem_nuoc_tui_minh_sync') : null;
+    function bcPost(){ if(bc){ bc.postMessage({ type:'store:update', store }); } }
+    if(bc){
+      bc.addEventListener('message', (e)=>{
+        if(!e || !e.data) return;
+        if(e.data.type==='store:update'){
+          store = e.data.store; render();
+        }
+      });
+    }
+
+    // --- Role from URL (?role=barista) & persist per tab ---
+    const urlRole = new URLSearchParams(location.search).get('role');
+    if(urlRole){ role = urlRole; }
+    try{ const savedRole = sessionStorage.getItem('tn_role'); if(savedRole) role = savedRole; }catch{}
+
+    function persistRole(){ try{ sessionStorage.setItem('tn_role', role); }catch{} }
+
+
+    // ---------- helpers ----------
+    function setRole(r){ role = r; persistRole(); render(); }
+    function statusLabel(s){ return { queued:'Chờ pha', brewing:'Đang pha', ready:'Sẵn sàng', delivered:'Đã giao', paid:'Đã thanh toán'}[s] || s; }
+    function calcOrderTotal(order){ return order.items.reduce((t,it)=>t+it.price*it.qty,0); }
+
+    function getQueues(){
+      const notPaid = store.orders.filter(o=>o.status!=='paid');
+      const brewing = notPaid.filter(o=>['queued','brewing'].includes(o.status))
+        .sort((a,b)=> (b.priority - a.priority) || (a.createdAt - b.createdAt));
+      const ready = notPaid.filter(o=>o.status==='ready').sort((a,b)=>a.createdAt-b.createdAt);
+      const delivered = notPaid.filter(o=>o.status==='delivered').sort((a,b)=>a.createdAt-b.createdAt);
+      return { brewing, ready, delivered, notPaid };
+    }
+
+    // ---------- mutations ----------
+    function setStatus(orderId, status){
+      // ưu tiên cập nhật qua Firebase nếu có
+      if (window.firebaseApi && window.firebaseApi.ready) {
+        const o = store.orders.find(x=>x.id===orderId);
+        if(!o) return;
+        const newTimeline = [...o.timeline, { status, ts: now() }];
+        window.firebaseApi.updateStatus(orderId, status, newTimeline).then((ok)=>{
+          if(!ok) alert('Không thể cập nhật trạng thái lên cloud');
+        });
+        return;
+      }
+      // Fallback local
+      store.orders = store.orders.map((o) =>
+        o.id === orderId ? { ...o, status, timeline: [...o.timeline, { status, ts: now() }] } : o
+      );
+      saveStore(); render();
+    }]} : o);
+      saveStore(); render();
+    }
+    function payOrder(orderId){ setStatus(orderId, 'paid'); closePay(); }
+
+    function resetData(){ if(!confirm('Xoá toàn bộ dữ liệu?')) return; store = { menu: seedMenu, orders: [], tables: store.tables }; cart = {}; saveStore(); render(); }
+
+    // ---------- staff actions ----------
+    function addToCart(id){ cart[id] = (cart[id]||0)+1; renderCart(); }
+    function decFromCart(id){ if(!cart[id]) return; cart[id] = Math.max(0, cart[id]-1); if(cart[id]===0) delete cart[id]; renderCart(); }
+
+    function submitOrder(){
+      const items = Object.entries(cart)
+        .map(([id, qty]) => {
+          const mi = store.menu.find((m) => m.id === id);
+          return mi && qty > 0 ? { menuItemId: id, name: mi.name, price: mi.price, qty } : null;
+        })
+        .filter(Boolean);
+
+      if (items.length === 0) return alert("Giỏ hàng trống");
+
+      const order = {
+        id: newId("ord"),
+        table: tablePicking,
+        items,
+        priority: calcPriority(items),
+        createdAt: now(),
+        status: "queued",
+        timeline: [{ status: "queued", ts: now() }],
+      };
+
+      if (window.firebaseApi && window.firebaseApi.ready) {
+        window.firebaseApi.pushOrder(order).then((ok)=>{
+          if(!ok) return alert('Không thể gửi đơn lên cloud');
+          cart = {}; render();
+          alert(`Đã gửi đơn cho bàn ${tablePicking}`);
+        });
+        return;
+      }
+
+      store.orders.push(order);
+      cart = {}; saveStore(); alert(`Đã gửi đơn cho bàn ${tablePicking}`); render();
+    } : null;
+      }).filter(Boolean);
+      if(items.length===0) return alert('Giỏ hàng trống');
+      const order = { id: newId('ord'), table: tablePicking, items, priority: calcPriority(items), createdAt: now(), status:'queued', timeline:[{status:'queued', ts: now()}] };
+      store.orders.push(order); cart = {}; saveStore(); alert('Đã gửi đơn cho bàn '+tablePicking); render();
+    }
+
+    // ---------- cashier modal ----------
+    function openPay(orderId){
+      viewingOrderId = orderId;
+      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
+      els.payTitle.textContent = `Thanh toán · Bàn ${o.table}`;
+      els.payLines.innerHTML = o.items.map(it=>`
+        <div class="flex items-center justify-between">
+          <span>${it.name} × ${it.qty}</span>
+          <span class="font-medium">${money(it.price*it.qty)}</span>
+        </div>`).join('');
+      els.payTotal.textContent = money(calcOrderTotal(o));
+      els.payModal.classList.remove('hidden');
+      requestAnimationFrame(()=>{
+        const box = els.payModal.querySelector('.modal-enter');
+        box && box.classList.add('modal-enter-active');
+      });
+    }
+    function closePay(){ viewingOrderId = null; els.payModal.classList.add('hidden'); }
+
+    // ---------- renderers ----------
+    function renderRole(){
+      Object.values(els.views).forEach(v=>v.classList.add('hidden'));
+      els.views[role].classList.remove('hidden');
+      els.roleSelect.value = role;
+    }
+
+    function renderStaff(){
+      // table select
+      els.tableSelect.innerHTML = Array.from({length: store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
+      els.tableSelect.value = String(tablePicking);
+      els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
+
+      // categories
+      const cats = ['All', ...Array.from(new Set(store.menu.map(m=>m.category)))];
+      els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+      // menu grid
+      const kw = (els.searchInput.value||'').toLowerCase();
+      const cat = els.catFilter.value || 'All';
+      const list = store.menu.filter(m=> (cat==='All'||m.category===cat) && (!kw||m.name.toLowerCase().includes(kw)) );
+      els.menuGrid.innerHTML = list.map(m=>`
+        <div class="border rounded-xl p-4 hover:shadow-sm">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="font-semibold text-gray-900">${m.name}</h3>
+              <p class="text-sm text-gray-500">${m.category}</p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${money(m.price)}</span>
+          </div>
+          <div class="mt-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <button data-dec="${m.id}" class="px-2 py-1 border rounded">-</button>
+              <span class="w-8 text-center">${cart[m.id]||0}</span>
+              <button data-inc="${m.id}" class="px-2 py-1 border rounded">+</button>
+            </div>
+            <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
+          </div>
+        </div>
+      `).join('');
+
+      els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc'))));
+      els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec'))));
+      els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-add'))));
+
+      renderCart();
+      // recent orders
+      const listRecent = store.orders.filter(o=>o.status!=='paid').sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
+      els.recentOrders.innerHTML = listRecent.map(o=>`
+        <div class="flex items-center justify-between border rounded-lg p-3">
+          <div>
+            <p class="font-medium">Bàn ${o.table}</p>
+            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
+          </div>
+          <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderCart(){
+      const entries = Object.entries(cart);
+      if(entries.length===0){ els.cartList.textContent = 'Chưa có món.'; els.cartTotal.textContent = '0₫'; return; }
+      els.cartList.innerHTML = entries.map(([id,qty])=>{
+        const mi = store.menu.find(m=>m.id===id); if(!mi) return '';
+        return `
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium">${mi.name}</p>
+              <p class="text-xs text-gray-500">${money(mi.price)} × ${qty}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button data-dec-cart="${id}" class="px-2 py-1 border rounded">-</button>
+              <span class="w-6 text-center">${qty}</span>
+              <button data-inc-cart="${id}" class="px-2 py-1 border rounded">+</button>
+            </div>
+          </div>`;
+      }).join('');
+      els.cartList.querySelectorAll('[data-dec-cart]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec-cart'))));
+      els.cartList.querySelectorAll('[data-inc-cart]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc-cart'))));
+
+      const total = entries.reduce((t,[id,qty])=>{
+        const mi = store.menu.find(m=>m.id===id); return t + (mi?mi.price*qty:0);
+      },0);
+      els.cartTotal.textContent = money(total);
+      els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
+    }
+
+    function renderBarista(){
+      // tab state
+      els.tabByTable.classList.toggle('bg-black', baristaTab==='by-table');
+      els.tabByTable.classList.toggle('text-white', baristaTab==='by-table');
+      els.tabByItem.classList.toggle('bg-black', baristaTab==='by-item');
+      els.tabByItem.classList.toggle('text-white', baristaTab==='by-item');
+
+      const { brewing } = getQueues();
+      // by table
+      const group = new Map();
+      brewing.forEach(o=>{ const arr = group.get(o.table)||[]; arr.push(o); group.set(o.table, arr); });
+      const entries = Array.from(group.entries()).sort((a,b)=>a[0]-b[0]);
+      els.baristaByTable.innerHTML = entries.map(([table,orders])=>`
+        <div class="border rounded-xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold">Bàn ${table}</h3>
+            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${orders.length} đơn</span>
+          </div>
+          <div class="space-y-3">
+            ${orders.map(o=>`
+              <div class="border rounded-lg p-3">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm text-gray-500">#${o.id.slice(-4)} · Ưu tiên ${o.priority}</p>
+                  <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
+                </div>
+                <ul class="mt-2 text-sm list-disc list-inside">
+                  ${o.items.map(it=>`<li>${it.name} × ${it.qty}</li>`).join('')}
+                </ul>
+                <div class="mt-3 flex gap-2">
+                  ${o.status==='queued' ? `<button data-start="${o.id}" class="px-3 py-1 rounded-lg bg-amber-600 text-white">Bắt đầu pha</button>`:''}
+                  ${o.status==='brewing' ? `<button data-ready="${o.id}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Hoàn thành</button>`:''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`).join('');
+
+      els.baristaByTable.querySelectorAll('[data-start]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-start'),'brewing')));
+      els.baristaByTable.querySelectorAll('[data-ready]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-ready'),'ready')));
+
+      // by item
+      const agg = new Map();
+      brewing.forEach(o=>o.items.forEach(it=>{ const v = agg.get(it.menuItemId)||{name:it.name,totalQty:0}; v.totalQty += it.qty; agg.set(it.menuItemId, v);}));
+      const rows = Array.from(agg.entries()).map(([id,v])=>({id,name:v.name,totalQty:v.totalQty}));
+      els.baristaByItem.innerHTML = rows.map(r=>`
+        <div class="border rounded-xl p-4">
+          <h4 class="font-semibold">${r.name}</h4>
+          <p class="text-3xl font-bold mt-2">${r.totalQty}</p>
+          <p class="text-xs text-gray-500 mt-1">Tổng số ly cần làm</p>
+        </div>`).join('');
+
+      els.baristaByTable.classList.toggle('hidden', baristaTab!=='by-table');
+      els.baristaByItem.classList.toggle('hidden', baristaTab!=='by-item');
+    }
+
+    function renderServer(){
+      const { ready, delivered } = getQueues();
+      els.readyList.innerHTML = ready.map(o=>`
+        <div class="border rounded-lg p-3 flex items-center justify-between">
+          <div>
+            <p class="font-medium">Bàn ${o.table}</p>
+            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
+          </div>
+          <button data-deliver="${o.id}" class="px-3 py-1 rounded-lg bg-indigo-600 text-white">Đã giao</button>
+        </div>`).join('') || '<p class="text-sm text-gray-500">Chưa có món sẵn sàng.</p>';
+      els.readyList.querySelectorAll('[data-deliver]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-deliver'),'delivered')));
+
+      els.deliveredList.innerHTML = delivered.map(o=>`
+        <div class="border rounded-lg p-3 flex items-center justify-between">
+          <div>
+            <p class="font-medium">Bàn ${o.table}</p>
+            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
+          </div>
+          <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">Chờ thanh toán</span>
+        </div>`).join('') || '<p class="text-sm text-gray-500">—</p>';
+    }
+
+    function renderCashier(){
+      const notPaid = store.orders.filter(o=>o.status!=='paid');
+      const paid = store.orders.filter(o=>o.status==='paid');
+      els.cashierNotPaid.innerHTML = notPaid.map(o=>`
+        <div class="border rounded-lg p-3 flex items-center justify-between">
+          <div>
+            <p class="font-semibold">Bàn ${o.table} · #${o.id.slice(-4)}</p>
+            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-bold">${money(calcOrderTotal(o))}</span>
+            <button data-pay="${o.id}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán</button>
+          </div>
+        </div>`).join('') || '<p class="text-sm text-gray-500">Không có đơn.</p>';
+      els.cashierNotPaid.querySelectorAll('[data-pay]').forEach(b=>b.addEventListener('click',e=>openPay(e.target.getAttribute('data-pay'))));
+
+      const paidCards = paid.slice().reverse().map(o=>`
+        <div class="border rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <p class="font-semibold">Bàn ${o.table}</p>
+            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">#${o.id.slice(-4)}</span>
+          </div>
+          <ul class="mt-2 text-sm list-disc list-inside">
+            ${o.items.map(it=>`<li>${it.name} × ${it.qty} — ${money(it.price*it.qty)}</li>`).join('')}
+          </ul>
+          <div class="pt-2 mt-2 border-t flex items-center justify-between">
+            <span class="font-semibold">Tổng</span>
+            <span class="font-bold">${money(calcOrderTotal(o))}</span>
+          </div>
+        </div>`).join('');
+      els.cashierPaid.innerHTML = paidCards || '<p class="text-sm text-gray-500">—</p>';
+
+      const totalToday = paid.reduce((s,o)=>s+calcOrderTotal(o),0);
+      els.cashierTotalToday.textContent = `Tổng: ${money(totalToday)}`;
+    }
+
+    function renderAdmin(){
+      els.tablesInput.value = store.tables;
+      els.menuTextarea.value = JSON.stringify(store.menu, null, 2);
+    }
+
+    function render(){
+      renderRole();
+      if(role==='staff') renderStaff();
+      if(role==='barista') renderBarista();
+      if(role==='server') renderServer();
+      if(role==='cashier') renderCashier();
+      if(role==='admin') renderAdmin();
+      saveStore();
+    }
+
+    // ---------- events ----------
+    els.roleSelect.addEventListener('change', e=>setRole(e.target.value));
+    // If role is provided in URL, lock the selector for kiosk mode
+    if(new URLSearchParams(location.search).get('role')){
+      els.roleSelect.setAttribute('disabled','disabled');
+      els.roleSelect.classList.add('opacity-60','cursor-not-allowed');
+    }
+    els.btnResetData.addEventListener('click', resetData);
+
+    // staff inputs
+    els.tableSelect.addEventListener('change', e=>{ tablePicking = Number(e.target.value); renderCart(); });
+    els.catFilter.addEventListener('change', ()=>renderStaff());
+    els.searchInput.addEventListener('input', ()=>renderStaff());
+    els.btnSubmitOrder.addEventListener('click', submitOrder);
+
+    // barista tabs
+    els.tabByTable.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
+    els.tabByItem.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
+
+    // modal events
+    [els.btnClosePay, els.btnCancelPay].forEach(b=>b.addEventListener('click', closePay));
+    els.btnConfirmPay.addEventListener('click', ()=>{ if(viewingOrderId) payOrder(viewingOrderId); });
+
+    // admin save
+    els.btnSaveAdmin.addEventListener('click', ()=>{
+      try{
+        const parsed = JSON.parse(els.menuTextarea.value);
+        if(!Array.isArray(parsed)) throw new Error('Menu phải là mảng items');
+        store.menu = parsed; store.tables = Math.max(1, Number(els.tablesInput.value)||20);
+        alert('Đã lưu cấu hình'); render();
+      }catch(e){ alert('Menu không hợp lệ: '+e.message); }
+    });
+
+    // initial
+    render();
+  </script>
+
+  <!-- === FIREBASE READY (paste your config) === -->
+  <script type="module">
+    // 1) DÁN cấu hình Firebase của bạn vào đây (thay thế các giá trị "PASTE_...")
+    //    Hướng dẫn lấy cấu hình: Firebase Console → Project settings → Your apps (Web) → SDK setup
+    window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC5g01aNIwU6Ysa5zsW2ahBmR_wiAHSc-0",
+  authDomain: "tiem-nuoc-tui-minh.firebaseapp.com",
+  databaseURL: "https://tiem-nuoc-tui-minh-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "tiem-nuoc-tui-minh",
+  appId: "1:599673062211:web:2ac6b038d1b17c6130a5f6"
+};
+
+
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
+    import { getDatabase, ref, onValue, push, set, update } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
+
+    const hasConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey !== 'PASTE_API_KEY';
+
+    const firebaseApi = {
+      app: null,
+      db: null,
+      auth: null,
+      user: null,
+      ordersRef: null,
+      ready: false,
+
+      async init(){
+        if(!hasConfig){ console.info('[Firebase] Chưa cấu hình, sẽ chạy chế độ localStorage.'); return; }
+        this.app = initializeApp(window.FIREBASE_CONFIG);
+        this.db = getDatabase(this.app);
+        this.auth = getAuth(this.app);
+        await signInAnonymously(this.auth);
+        onAuthStateChanged(this.auth, (u)=>{ this.user = u || null; });
+        this.ordersRef = ref(this.db, 'orders');
+        this.ready = true;
+        console.info('[Firebase] Đã sẵn sàng');
+      },
+
+      subscribeOrders(callback){
+        if(!this.ready){ return; }
+        onValue(this.ordersRef, (snap)=>{
+          const val = snap.val() || {};
+          const arr = Object.entries(val).map(([id, data])=>({ id, ...data })).sort((a,b)=>a.createdAt - b.createdAt);
+          callback(arr);
+        });
+      },
+
+      async pushOrder(order){
+        if(!this.ready) return false;
+        const newRef = push(this.ordersRef);
+        const id = newRef.key;
+        await set(newRef, { ...order, id });
+        return true;
+      },
+
+      async updateStatus(orderId, status, timeline){
+        if(!this.ready) return false;
+        const r = ref(this.db, `orders/${orderId}`);
+        await update(r, { status, timeline });
+        return true;
+      }
+    };
+
+    window.firebaseApi = firebaseApi;
+
+    // Tự khởi tạo và đăng ký lắng nghe nếu có cấu hình
+    (async () => {
+      await firebaseApi.init();
+      if(firebaseApi.ready){
+        firebaseApi.subscribeOrders((ordersFromCloud)=>{
+          // đồng bộ vào store hiện tại
+          try{
+            window.store.orders = ordersFromCloud;
+            if(typeof window.render === 'function') window.render();
+          }catch(e){ console.error(e); }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
