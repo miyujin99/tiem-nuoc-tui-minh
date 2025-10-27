@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiệm Nước Tụi Mình · POS (HTML Prototype)</title>
+  <title>Tiệm Nước Tụi Mình · POS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .modal-enter { opacity: 0; transform: translateY(6px); }
@@ -18,11 +18,11 @@
         <span class="text-2xl">🧋</span>
         <div>
           <h1 class="text-lg font-bold">Tiệm Nước Tụi Mình · POS</h1>
-          <p class="text-xs text-gray-500">HTML + Tailwind · localStorage / Firebase-ready</p>
+          <p class="text-xs text-gray-500">HTML + Tailwind · localStorage / Firebase</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò (demo)">
+        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò">
           <option value="staff">Nhân viên (Gọi món)</option>
           <option value="barista">Quầy pha chế</option>
           <option value="server">Nhân viên giao bàn</option>
@@ -288,8 +288,18 @@
     function resetData(){ if(!confirm('Xoá toàn bộ dữ liệu?')) return; store = { menu: seedMenu, orders: [], tables: store.tables }; cart = {}; saveStore(); render(); }
 
     // ---------- staff actions ----------
-    function addToCart(id){ cart[id] = (cart[id]||0)+1; renderCart(); }
-    function decFromCart(id){ if(!cart[id]) return; cart[id] = Math.max(0, cart[id]-1); if(cart[id]===0) delete cart[id]; renderCart(); }
+    function addToCart(id){
+  cart[id] = (cart[id] || 0) + 1;
+  renderStaff();   // <-- cập nhật cả số trên card + giỏ hàng
+}
+
+function decFromCart(id){
+  if (!cart[id]) return;
+  cart[id] = Math.max(0, cart[id] - 1);
+  if (cart[id] === 0) delete cart[id];
+  renderStaff();   // <-- cập nhật cả số trên card + giỏ hàng
+}
+
 
     function submitOrder(){
       const items = Object.entries(cart)
@@ -544,7 +554,7 @@
 
     // ---------- events ----------
     els.roleSelect.addEventListener('change', e=>setRole(e.target.value));
-    // If role is provided in URL, lock the selector for kiosk mode
+    // Kiosk mode nếu có ?role=
     if(new URLSearchParams(location.search).get('role')){
       els.roleSelect.setAttribute('disabled','disabled');
       els.roleSelect.classList.add('opacity-60','cursor-not-allowed');
@@ -579,9 +589,8 @@
     render();
   </script>
 
-  <!-- === FIREBASE READY (paste your config) === -->
+  <!-- === FIREBASE (đã chèn cấu hình của bạn) === -->
   <script type="module">
-    // DÁN cấu hình Firebase của bạn vào đây (thay các giá trị "PASTE_...")
     window.FIREBASE_CONFIG = {
       apiKey: "AIzaSyC5g01aNIwU6Ysa5zsW2ahBmR_wiAHSc-0",
       authDomain: "tiem-nuoc-tui-minh.firebaseapp.com",
@@ -594,50 +603,51 @@
     import { getDatabase, ref, onValue, push, set, update } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
 
-    const hasConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey !== 'PASTE_API_KEY';
+    const hasConfig = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
 
     const firebaseApi = {
-      app: null,
-      db: null,
-      auth: null,
-      user: null,
-      ordersRef: null,
-      ready: false,
-
+      app: null, db: null, auth: null, user: null, ordersRef: null, ready: false,
       async init(){
-        if(!hasConfig){ console.info('[Firebase] Chưa cấu hình, sẽ chạy chế độ localStorage.'); return; }
-        this.app = initializeApp(window.FIREBASE_CONFIG);
-        this.db = getDatabase(this.app);
-        this.auth = getAuth(this.app);
-        await signInAnonymously(this.auth);
-        onAuthStateChanged(this.auth, (u)=>{ this.user = u || null; });
-        this.ordersRef = ref(this.db, 'orders');
-        this.ready = true;
-        console.info('[Firebase] Đã sẵn sàng');
-      },
+        if(!hasConfig){ console.info('[Firebase] No config → dùng localStorage'); return; }
+        try {
+          this.app  = initializeApp(window.FIREBASE_CONFIG);
+          this.db   = getDatabase(this.app);
+          this.auth = getAuth(this.app);
 
-      subscribeOrders(callback){
-        if(!this.ready){ return; }
+          await signInAnonymously(this.auth);
+          onAuthStateChanged(this.auth, (u)=>{ this.user = u || null; });
+
+          this.ordersRef = ref(this.db, 'orders');
+          this.ready = true;
+          console.info('[Firebase] READY');
+        } catch (err) {
+          console.error('[Firebase] Lỗi khởi tạo:', err);
+          this.ready = false; // fallback local
+        }
+      },
+      subscribeOrders(cb){
+        if(!this.ready) return;
         onValue(this.ordersRef, (snap)=>{
           const val = snap.val() || {};
-          const arr = Object.entries(val).map(([id, data])=>({ id, ...data })).sort((a,b)=>a.createdAt - b.createdAt);
-          callback(arr);
+          const arr = Object.entries(val).map(([id,data])=>({ id, ...data }))
+                       .sort((a,b)=>a.createdAt - b.createdAt);
+          cb(arr);
         });
       },
-
       async pushOrder(order){
         if(!this.ready) return false;
-        const newRef = push(this.ordersRef);
-        const id = newRef.key;
-        await set(newRef, { ...order, id });
-        return true;
+        try {
+          const newRef = push(this.ordersRef);
+          await set(newRef, { ...order, id: newRef.key });
+          return true;
+        } catch (e) { console.error(e); return false; }
       },
-
       async updateStatus(orderId, status, timeline){
         if(!this.ready) return false;
-        const r = ref(this.db, `orders/${orderId}`);
-        await update(r, { status, timeline });
-        return true;
+        try {
+          await update(ref(this.db, `orders/${orderId}`), { status, timeline });
+          return true;
+        } catch (e) { console.error(e); return false; }
       }
     };
 
