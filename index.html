@@ -6,8 +6,8 @@
   <title>Tiệm Nước Tụi Mình · POS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .modal-enter { opacity: 0; transform: translateY(6px); }
-    .modal-enter-active { opacity: 1; transform: translateY(0); transition: all .15s ease; }
+    .modal-enter{opacity:0;transform:translateY(6px)}
+    .modal-enter-active{opacity:1;transform:translateY(0);transition:all .15s ease}
   </style>
 </head>
 <body class="min-h-screen bg-gray-100">
@@ -22,7 +22,7 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm" title="Chọn vai trò">
+        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm">
           <option value="staff">Nhân viên (Gọi món)</option>
           <option value="barista">Quầy pha chế</option>
           <option value="server">Nhân viên giao bàn</option>
@@ -35,7 +35,7 @@
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-    <!-- STAFF VIEW -->
+    <!-- STAFF -->
     <section id="view-staff" class="hidden">
       <div class="grid md:grid-cols-3 gap-6">
         <div class="md:col-span-2 space-y-4">
@@ -69,7 +69,7 @@
       </div>
     </section>
 
-    <!-- BARISTA VIEW -->
+    <!-- BARISTA -->
     <section id="view-barista" class="hidden space-y-4">
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <div class="flex items-center justify-between mb-3">
@@ -88,7 +88,7 @@
       </section>
     </section>
 
-    <!-- SERVER VIEW -->
+    <!-- SERVER -->
     <section id="view-server" class="hidden grid md:grid-cols-2 gap-6">
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Món đã sẵn sàng</h2>
@@ -100,7 +100,7 @@
       </section>
     </section>
 
-    <!-- CASHIER VIEW -->
+    <!-- CASHIER -->
     <section id="view-cashier" class="hidden space-y-4">
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Chờ thanh toán</h2>
@@ -115,7 +115,7 @@
       </section>
     </section>
 
-    <!-- ADMIN VIEW -->
+    <!-- ADMIN -->
     <section id="view-admin" class="hidden grid md:grid-cols-2 gap-6">
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Cấu hình quán</h2>
@@ -154,30 +154,16 @@
   <script>
     const STORAGE_KEY = 'tiemnuoctuiminh_pos_v1_html';
     const seedMenu = [
-      { id: 'mt-truyen-thong', name: 'Trà sữa truyền thống', price: 32000, category: 'Milk Tea' },
-      { id: 'mt-matcha', name: 'Matcha sữa', price: 38000, category: 'Milk Tea' },
-      { id: 'mt-olong', name: 'Oolong sữa', price: 36000, category: 'Milk Tea' },
-      { id: 'tea-dao', name: 'Hồng trà đào', price: 35000, category: 'Tea' },
-      { id: 'tea-vai', name: 'Trà vải', price: 35000, category: 'Tea' },
-      { id: 'macchiato-oolong', name: 'Oolong macchiato', price: 42000, category: 'Cheese' },
-      { id: 'yq-sugarcane', name: 'Nước mía tắc', price: 25000, category: 'Fresh' },
-      { id: 'topping-tranchau', name: '+ Trân châu', price: 5000, category: 'Topping' },
-      { id: 'topping-thach', name: '+ Thạch trái cây', price: 6000, category: 'Topping' },
+      { id:'mt-truyen-thong', name:'Trà sữa truyền thống', price:32000, category:'Milk Tea' },
+      { id:'mt-matcha', name:'Matcha sữa', price:38000, category:'Milk Tea' },
+      { id:'mt-olong', name:'Oolong sữa', price:36000, category:'Milk Tea' },
+      { id:'tea-dao', name:'Hồng trà đào', price:35000, category:'Tea' },
+      { id:'tea-vai', name:'Trà vải', price:35000, category:'Tea' },
+      { id:'macchiato-oolong', name:'Oolong macchiato', price:42000, category:'Cheese' },
+      { id:'yq-sugarcane', name:'Nước mía tắc', price:25000, category:'Fresh' },
+      { id:'topping-tranchau', name:'+ Trân châu', price:5000, category:'Topping' },
+      { id:'topping-thach', name:'+ Thạch trái cây', price:6000, category:'Topping' },
     ];
-
-    function money(n){ return n.toLocaleString('vi-VN') + '₫'; }
-    function now(){ return Date.now(); }
-    function newId(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
-    function calcPriority(items){ return items.reduce((s,it)=>s+it.qty,0); }
-
-    function loadStore(){
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return { menu: seedMenu, orders: [], tables: 20 };
-        return JSON.parse(raw);
-      }catch(e){ return { menu: seedMenu, orders: [], tables: 20 }; }
-    }
-    function saveStore(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); bcPost(); }
 
     const els = {
       roleSelect: document.getElementById('roleSelect'),
@@ -189,7 +175,6 @@
         cashier: document.getElementById('view-cashier'),
         admin: document.getElementById('view-admin'),
       },
-      // staff
       tableSelect: document.getElementById('tableSelect'),
       catFilter: document.getElementById('catFilter'),
       searchInput: document.getElementById('searchInput'),
@@ -199,23 +184,18 @@
       cartTotal: document.getElementById('cartTotal'),
       btnSubmitOrder: document.getElementById('btnSubmitOrder'),
       recentOrders: document.getElementById('recentOrders'),
-      // barista
       tabByTable: document.getElementById('tabByTable'),
       tabByItem: document.getElementById('tabByItem'),
       baristaByTable: document.getElementById('baristaByTable'),
       baristaByItem: document.getElementById('baristaByItem'),
-      // server
       readyList: document.getElementById('readyList'),
       deliveredList: document.getElementById('deliveredList'),
-      // cashier
       cashierNotPaid: document.getElementById('cashierNotPaid'),
       cashierPaid: document.getElementById('cashierPaid'),
       cashierTotalToday: document.getElementById('cashierTotalToday'),
-      // admin
       tablesInput: document.getElementById('tablesInput'),
       menuTextarea: document.getElementById('menuTextarea'),
       btnSaveAdmin: document.getElementById('btnSaveAdmin'),
-      // modal
       payModal: document.getElementById('payModal'),
       payTitle: document.getElementById('payTitle'),
       payLines: document.getElementById('payLines'),
@@ -225,125 +205,124 @@
       btnConfirmPay: document.getElementById('btnConfirmPay'),
     };
 
+    function money(n){ return n.toLocaleString('vi-VN')+'₫'; }
+    function now(){ return Date.now(); }
+    function newId(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
+    function calcPriority(items){ return items.reduce((s,it)=>s+it.qty,0); }
+
+    function loadStore(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return { menu: seedMenu, orders: [], tables: 20 };
+        const parsed = JSON.parse(raw);
+        return { menu: parsed.menu||seedMenu, orders: parsed.orders||[], tables: parsed.tables||20 };
+      }catch{ return { menu: seedMenu, orders: [], tables: 20 }; }
+    }
+
+    // Khi dùng Firebase, chỉ lưu menu/tables vào local để tránh vòng lặp & nhấp nháy
+    function saveLocalOnly(){
+      const shadow = { menu: store.menu, orders: [], tables: store.tables };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(shadow));
+      if(bc) bc.postMessage({ type:'store:update', store: shadow });
+    }
+
     let store = loadStore();
-    window.store = store; // expose for Firebase module
-    let cart = {}; // {menuItemId: qty}
+    window.store = store;
+    let cart = {};
     let role = 'staff';
     let baristaTab = 'by-table';
     let tablePicking = 1;
     let viewingOrderId = null;
 
-    // --- Multi-tab sync (same device) via BroadcastChannel ---
+    // Sync nội bộ tab
     const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('tiem_nuoc_tui_minh_sync') : null;
-    function bcPost(){ if(bc){ bc.postMessage({ type:'store:update', store }); } }
-    if(bc){
-      bc.addEventListener('message', (e)=>{
-        if(!e || !e.data) return;
-        if(e.data.type==='store:update'){
-          store = e.data.store; render();
-        }
-      });
-    }
+    if(bc){ bc.addEventListener('message', e=>{ if(e?.data?.type==='store:update'){ store = {...store, ...e.data.store}; render(); } }); }
 
-    // --- Role from URL (?role=barista) & persist per tab ---
+    // Role từ URL / phiên
     const urlRole = new URLSearchParams(location.search).get('role');
-    if(urlRole){ role = urlRole; }
+    if(urlRole) role = urlRole;
     try{ const savedRole = sessionStorage.getItem('tn_role'); if(savedRole) role = savedRole; }catch{}
     function persistRole(){ try{ sessionStorage.setItem('tn_role', role); }catch{} }
 
-    // ---------- helpers ----------
     function setRole(r){ role = r; persistRole(); render(); }
-    function statusLabel(s){ return { queued:'Chờ pha', brewing:'Đang pha', ready:'Sẵn sàng', delivered:'Đã giao', paid:'Đã thanh toán'}[s] || s; }
-    function calcOrderTotal(order){ return order.items.reduce((t,it)=>t+it.price*it.qty,0); }
+    function statusLabel(s){ return ({queued:'Chờ pha',brewing:'Đang pha',ready:'Sẵn sàng',delivered:'Đã giao',paid:'Đã thanh toán'})[s]||s; }
+    function calcOrderTotal(o){ return o.items.reduce((t,it)=>t+it.price*it.qty,0); }
 
     function getQueues(){
       const notPaid = store.orders.filter(o=>o.status!=='paid');
       const brewing = notPaid.filter(o=>['queued','brewing'].includes(o.status))
-        .sort((a,b)=> (b.priority - a.priority) || (a.createdAt - b.createdAt));
+        .sort((a,b)=> (b.priority-b.priority)||(a.createdAt-b.createdAt));
       const ready = notPaid.filter(o=>o.status==='ready').sort((a,b)=>a.createdAt-b.createdAt);
       const delivered = notPaid.filter(o=>o.status==='delivered').sort((a,b)=>a.createdAt-b.createdAt);
       return { brewing, ready, delivered, notPaid };
     }
 
-    // ---------- mutations ----------
+    // --- Mutations ---
     function setStatus(orderId, status){
-      // ưu tiên cập nhật qua Firebase nếu có
-      if (window.firebaseApi && window.firebaseApi.ready) {
-        const o = store.orders.find(x=>x.id===orderId);
-        if(!o) return;
-        const newTimeline = [...o.timeline, { status, ts: now() }];
-        window.firebaseApi.updateStatus(orderId, status, newTimeline).then((ok)=>{
+      if(window.firebaseApi?.ready){
+        const o = store.orders.find(x=>x.id===orderId); if(!o) return;
+        const timeline = [...o.timeline, {status, ts: now()}];
+        window.firebaseApi.updateStatus(orderId, status, timeline).then(ok=>{
           if(!ok) alert('Không thể cập nhật trạng thái lên cloud');
         });
         return;
       }
-      // Fallback local
-      store.orders = store.orders.map((o) =>
-        o.id === orderId ? { ...o, status, timeline: [...o.timeline, { status, ts: now() }] } : o
-      );
-      saveStore(); render();
+      store.orders = store.orders.map(o=> o.id===orderId ? {...o, status, timeline:[...o.timeline,{status,ts:now()}]} : o);
+      saveLocalOnly(); render();
     }
-    function payOrder(orderId){ setStatus(orderId, 'paid'); closePay(); }
+    function payOrder(orderId){ setStatus(orderId,'paid'); closePay(); }
 
-    function resetData(){ if(!confirm('Xoá toàn bộ dữ liệu?')) return; store = { menu: seedMenu, orders: [], tables: store.tables }; cart = {}; saveStore(); render(); }
+    function resetData(){
+      if(!confirm('Xoá toàn bộ đơn hàng?')) return;
+      cart = {};
+      store.orders = [];
+      if(window.firebaseApi?.ready){
+        window.firebaseApi.clearAllOrders().then(()=>{
+          saveLocalOnly(); render();
+        });
+      }else{
+        saveLocalOnly(); render();
+      }
+    }
 
-    // ---------- staff actions ----------
-    function addToCart(id){
-  cart[id] = (cart[id] || 0) + 1;
-  renderStaff();   // <-- cập nhật cả số trên card + giỏ hàng
-}
-
-function decFromCart(id){
-  if (!cart[id]) return;
-  cart[id] = Math.max(0, cart[id] - 1);
-  if (cart[id] === 0) delete cart[id];
-  renderStaff();   // <-- cập nhật cả số trên card + giỏ hàng
-}
-
+    // Staff actions
+    function addToCart(id){ cart[id]=(cart[id]||0)+1; renderStaff(); }
+    function decFromCart(id){ if(!cart[id]) return; cart[id]=Math.max(0,cart[id]-1); if(!cart[id]) delete cart[id]; renderStaff(); }
 
     function submitOrder(){
-      const items = Object.entries(cart)
-        .map(([id, qty]) => {
-          const mi = store.menu.find((m) => m.id === id);
-          return mi && qty > 0 ? { menuItemId: id, name: mi.name, price: mi.price, qty } : null;
-        })
-        .filter(Boolean);
-      if (items.length === 0) return alert('Giỏ hàng trống');
+      const items = Object.entries(cart).map(([id,qty])=>{
+        const mi = store.menu.find(m=>m.id===id);
+        return mi && qty>0 ? {menuItemId:id,name:mi.name,price:mi.price,qty} : null;
+      }).filter(Boolean);
+      if(items.length===0) return alert('Giỏ hàng trống');
 
-      const order = { id: newId('ord'), table: tablePicking, items, priority: calcPriority(items), createdAt: now(), status:'queued', timeline:[{status:'queued', ts: now()}] };
+      const order = { id:newId('ord'), table:tablePicking, items, priority:calcPriority(items), createdAt:now(), status:'queued', timeline:[{status:'queued',ts:now()}] };
 
-      if (window.firebaseApi && window.firebaseApi.ready) {
-        window.firebaseApi.pushOrder(order).then((ok)=>{
+      if(window.firebaseApi?.ready){
+        window.firebaseApi.pushOrder(order).then(ok=>{
           if(!ok) return alert('Không thể gửi đơn lên cloud');
-          cart = {}; render();
+          cart={}; render();
           alert(`Đã gửi đơn cho bàn ${tablePicking}`);
         });
         return;
       }
-      // Fallback local
-      store.orders.push(order); cart = {}; saveStore(); alert('Đã gửi đơn cho bàn '+tablePicking); render();
+      store.orders.push(order); cart={}; saveLocalOnly(); alert(`Đã gửi đơn cho bàn ${tablePicking}`); render();
     }
 
-    // ---------- cashier modal ----------
-    function openPay(orderId){
-      viewingOrderId = orderId;
-      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
+    // Pay modal
+    function openPay(id){
+      viewingOrderId = id;
+      const o = store.orders.find(x=>x.id===id); if(!o) return;
       els.payTitle.textContent = `Thanh toán · Bàn ${o.table}`;
       els.payLines.innerHTML = o.items.map(it=>`
-        <div class="flex items-center justify-between">
-          <span>${it.name} × ${it.qty}</span>
-          <span class="font-medium">${money(it.price*it.qty)}</span>
-        </div>`).join('');
+        <div class="flex items-center justify-between"><span>${it.name} × ${it.qty}</span><span class="font-medium">${money(it.price*it.qty)}</span></div>`).join('');
       els.payTotal.textContent = money(calcOrderTotal(o));
       els.payModal.classList.remove('hidden');
-      requestAnimationFrame(()=>{
-        const box = els.payModal.querySelector('.modal-enter');
-        box && box.classList.add('modal-enter-active');
-      });
+      requestAnimationFrame(()=>{ els.payModal.querySelector('.modal-enter')?.classList.add('modal-enter-active'); });
     }
-    function closePay(){ viewingOrderId = null; els.payModal.classList.add('hidden'); }
+    function closePay(){ viewingOrderId=null; els.payModal.classList.add('hidden'); }
 
-    // ---------- renderers ----------
+    // --- Renderers ---
     function renderRole(){
       Object.values(els.views).forEach(v=>v.classList.add('hidden'));
       els.views[role].classList.remove('hidden');
@@ -351,16 +330,17 @@ function decFromCart(id){
     }
 
     function renderStaff(){
-      els.tableSelect.innerHTML = Array.from({length: store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
+      els.tableSelect.innerHTML = Array.from({length:store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
       els.tableSelect.value = String(tablePicking);
       els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
 
-      const cats = ['All', ...Array.from(new Set(store.menu.map(m=>m.category)) )];
+      const cats = ['All',...new Set(store.menu.map(m=>m.category))];
       els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
 
       const kw = (els.searchInput.value||'').toLowerCase();
       const cat = els.catFilter.value || 'All';
-      const list = store.menu.filter(m=> (cat==='All'||m.category===cat) && (!kw||m.name.toLowerCase().includes(kw)) );
+      const list = store.menu.filter(m => (cat==='All'||m.category===cat) && (!kw||m.name.toLowerCase().includes(kw)));
+
       els.menuGrid.innerHTML = list.map(m=>`
         <div class="border rounded-xl p-4 hover:shadow-sm">
           <div class="flex items-start justify-between gap-3">
@@ -378,8 +358,7 @@ function decFromCart(id){
             </div>
             <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
           </div>
-        </div>
-      `).join('');
+        </div>`).join('');
 
       els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc'))));
       els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec'))));
@@ -395,32 +374,26 @@ function decFromCart(id){
             <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
           </div>
           <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
 
     function renderCart(){
       const entries = Object.entries(cart);
-      if(entries.length===0){ els.cartList.textContent = 'Chưa có món.'; els.cartTotal.textContent = '0₫'; return; }
+      if(entries.length===0){ els.cartList.textContent='Chưa có món.'; els.cartTotal.textContent='0₫'; return; }
       els.cartList.innerHTML = entries.map(([id,qty])=>{
         const mi = store.menu.find(m=>m.id===id); if(!mi) return '';
-        return `
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-medium">${mi.name}</p>
-              <p class="text-xs text-gray-500">${money(mi.price)} × ${qty}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button data-dec-cart="${id}" class="px-2 py-1 border rounded">-</button>
-              <span class="w-6 text-center">${qty}</span>
-              <button data-inc-cart="${id}" class="px-2 py-1 border rounded">+</button>
-            </div>
-          </div>`;
+        return `<div class="flex items-center justify-between">
+          <div><p class="font-medium">${mi.name}</p><p class="text-xs text-gray-500">${money(mi.price)} × ${qty}</p></div>
+          <div class="flex items-center gap-2">
+            <button data-dec-cart="${id}" class="px-2 py-1 border rounded">-</button>
+            <span class="w-6 text-center">${qty}</span>
+            <button data-inc-cart="${id}" class="px-2 py-1 border rounded">+</button>
+          </div></div>`;
       }).join('');
       els.cartList.querySelectorAll('[data-dec-cart]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec-cart'))));
       els.cartList.querySelectorAll('[data-inc-cart]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc-cart'))));
 
-      const total = entries.reduce((t,[id,qty])=>{ const mi = store.menu.find(m=>m.id===id); return t + (mi?mi.price*qty:0); },0);
+      const total = entries.reduce((t,[id,qty])=>{ const mi=store.menu.find(m=>m.id===id); return t+(mi?mi.price*qty:0); },0);
       els.cartTotal.textContent = money(total);
       els.cartTitle.textContent = `Giỏ hàng · Bàn ${tablePicking}`;
     }
@@ -433,8 +406,9 @@ function decFromCart(id){
 
       const { brewing } = getQueues();
       const group = new Map();
-      brewing.forEach(o=>{ const arr = group.get(o.table)||[]; arr.push(o); group.set(o.table, arr); });
-      const entries = Array.from(group.entries()).sort((a,b)=>a[0]-b[0]);
+      brewing.forEach(o=>{ const arr=group.get(o.table)||[]; arr.push(o); group.set(o.table,arr); });
+      const entries = [...group.entries()].sort((a,b)=>a[0]-b[0]);
+
       els.baristaByTable.innerHTML = entries.map(([table,orders])=>`
         <div class="border rounded-xl p-4">
           <div class="flex items-center justify-between mb-2">
@@ -455,8 +429,7 @@ function decFromCart(id){
                   ${o.status==='queued' ? `<button data-start="${o.id}" class="px-3 py-1 rounded-lg bg-amber-600 text-white">Bắt đầu pha</button>`:''}
                   ${o.status==='brewing' ? `<button data-ready="${o.id}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Hoàn thành</button>`:''}
                 </div>
-              </div>
-            `).join('')}
+              </div>`).join('')}
           </div>
         </div>`).join('');
 
@@ -464,37 +437,31 @@ function decFromCart(id){
       els.baristaByTable.querySelectorAll('[data-ready]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-ready'),'ready')));
 
       const agg = new Map();
-      brewing.forEach(o=>o.items.forEach(it=>{ const v = agg.get(it.menuItemId)||{name:it.name,totalQty:0}; v.totalQty += it.qty; agg.set(it.menuItemId, v);}));
-      const rows = Array.from(agg.entries()).map(([id,v])=>({id,name:v.name,totalQty:v.totalQty}));
+      brewing.forEach(o=>o.items.forEach(it=>{ const v=agg.get(it.menuItemId)||{name:it.name,totalQty:0}; v.totalQty+=it.qty; agg.set(it.menuItemId,v); }));
+      const rows = [...agg.entries()].map(([id,v])=>({id,name:v.name,totalQty:v.totalQty}));
       els.baristaByItem.innerHTML = rows.map(r=>`
-        <div class="border rounded-xl p-4">
-          <h4 class="font-semibold">${r.name}</h4>
-          <p class="text-3xl font-bold mt-2">${r.totalQty}</p>
-          <p class="text-xs text-gray-500 mt-1">Tổng số ly cần làm</p>
-        </div>`).join('');
+        <div class="border rounded-xl p-4"><h4 class="font-semibold">${r.name}</h4>
+        <p class="text-3xl font-bold mt-2">${r.totalQty}</p>
+        <p class="text-xs text-gray-500 mt-1">Tổng số ly cần làm</p></div>`).join('');
 
-      els.baristaByTable.classList.toggle('hidden', baristaTab!=='by-table');
-      els.baristaByItem.classList.toggle('hidden', baristaTab!=='by-item');
+      els.baristaByTable.classList.toggle('hidden',baristaTab!=='by-table');
+      els.baristaByItem.classList.toggle('hidden',baristaTab!=='by-item');
     }
 
     function renderServer(){
-      const { ready, delivered } = getQueues();
+      const {ready,delivered} = getQueues();
       els.readyList.innerHTML = ready.map(o=>`
         <div class="border rounded-lg p-3 flex items-center justify-between">
-          <div>
-            <p class="font-medium">Bàn ${o.table}</p>
-            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
-          </div>
+          <div><p class="font-medium">Bàn ${o.table}</p>
+          <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p></div>
           <button data-deliver="${o.id}" class="px-3 py-1 rounded-lg bg-indigo-600 text-white">Đã giao</button>
         </div>`).join('') || '<p class="text-sm text-gray-500">Chưa có món sẵn sàng.</p>';
       els.readyList.querySelectorAll('[data-deliver]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-deliver'),'delivered')));
 
       els.deliveredList.innerHTML = delivered.map(o=>`
         <div class="border rounded-lg p-3 flex items-center justify-between">
-          <div>
-            <p class="font-medium">Bàn ${o.table}</p>
-            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
-          </div>
+          <div><p class="font-medium">Bàn ${o.table}</p>
+          <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p></div>
           <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">Chờ thanh toán</span>
         </div>`).join('') || '<p class="text-sm text-gray-500">—</p>';
     }
@@ -504,10 +471,8 @@ function decFromCart(id){
       const paid = store.orders.filter(o=>o.status==='paid');
       els.cashierNotPaid.innerHTML = notPaid.map(o=>`
         <div class="border rounded-lg p-3 flex items-center justify-between">
-          <div>
-            <p class="font-semibold">Bàn ${o.table} · #${o.id.slice(-4)}</p>
-            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
-          </div>
+          <div><p class="font-semibold">Bàn ${o.table} · #${o.id.slice(-4)}</p>
+          <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p></div>
           <div class="flex items-center gap-3">
             <span class="font-bold">${money(calcOrderTotal(o))}</span>
             <button data-pay="${o.id}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán</button>
@@ -537,11 +502,11 @@ function decFromCart(id){
 
     function renderAdmin(){
       els.tablesInput.value = store.tables;
-      els.menuTextarea.value = JSON.stringify(store.menu, null, 2);
+      els.menuTextarea.value = JSON.stringify(store.menu,null,2);
     }
 
     function render(){
-      window.store = store; // keep globals in sync for Firebase module
+      window.store = store;
       window.render = render;
       renderRole();
       if(role==='staff') renderStaff();
@@ -549,33 +514,29 @@ function decFromCart(id){
       if(role==='server') renderServer();
       if(role==='cashier') renderCashier();
       if(role==='admin') renderAdmin();
-      saveStore();
+      // khi realtime bật: chỉ lưu menu/tables (tránh flicker)
+      saveLocalOnly();
     }
 
-    // ---------- events ----------
+    // Events
     els.roleSelect.addEventListener('change', e=>setRole(e.target.value));
-    // Kiosk mode nếu có ?role=
     if(new URLSearchParams(location.search).get('role')){
       els.roleSelect.setAttribute('disabled','disabled');
       els.roleSelect.classList.add('opacity-60','cursor-not-allowed');
     }
     els.btnResetData.addEventListener('click', resetData);
 
-    // staff inputs
-    els.tableSelect.addEventListener('change', e=>{ tablePicking = Number(e.target.value); renderCart(); });
+    els.tableSelect.addEventListener('change', e=>{ tablePicking=Number(e.target.value); renderCart(); });
     els.catFilter.addEventListener('change', ()=>renderStaff());
     els.searchInput.addEventListener('input', ()=>renderStaff());
     els.btnSubmitOrder.addEventListener('click', submitOrder);
 
-    // barista tabs
     els.tabByTable.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
     els.tabByItem.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
 
-    // modal events
     [els.btnClosePay, els.btnCancelPay].forEach(b=>b.addEventListener('click', closePay));
     els.btnConfirmPay.addEventListener('click', ()=>{ if(viewingOrderId) payOrder(viewingOrderId); });
 
-    // admin save
     els.btnSaveAdmin.addEventListener('click', ()=>{
       try{
         const parsed = JSON.parse(els.menuTextarea.value);
@@ -585,12 +546,12 @@ function decFromCart(id){
       }catch(e){ alert('Menu không hợp lệ: '+e.message); }
     });
 
-    // initial
     render();
   </script>
 
-  <!-- === FIREBASE (đã chèn cấu hình của bạn) === -->
+  <!-- === FIREBASE (đã cấu hình) === -->
   <script type="module">
+    // Cấu hình của bạn
     window.FIREBASE_CONFIG = {
       apiKey: "AIzaSyC5g01aNIwU6Ysa5zsW2ahBmR_wiAHSc-0",
       authDomain: "tiem-nuoc-tui-minh.firebaseapp.com",
@@ -606,59 +567,62 @@ function decFromCart(id){
     const hasConfig = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
 
     const firebaseApi = {
-      app: null, db: null, auth: null, user: null, ordersRef: null, ready: false,
+      app:null, db:null, auth:null, user:null, ordersRef:null, ready:false,
+      lastHash:null, // để tránh render lặp
       async init(){
-        if(!hasConfig){ console.info('[Firebase] No config → dùng localStorage'); return; }
-        try {
-          this.app  = initializeApp(window.FIREBASE_CONFIG);
-          this.db   = getDatabase(this.app);
+        if(!hasConfig){ console.info('[Firebase] No config → local only'); return; }
+        try{
+          this.app = initializeApp(window.FIREBASE_CONFIG);
+          this.db = getDatabase(this.app);
           this.auth = getAuth(this.app);
-
           await signInAnonymously(this.auth);
-          onAuthStateChanged(this.auth, (u)=>{ this.user = u || null; });
-
-          this.ordersRef = ref(this.db, 'orders');
+          onAuthStateChanged(this.auth,(u)=>{ this.user=u||null; });
+          this.ordersRef = ref(this.db,'orders');
           this.ready = true;
           console.info('[Firebase] READY');
-        } catch (err) {
-          console.error('[Firebase] Lỗi khởi tạo:', err);
-          this.ready = false; // fallback local
+        }catch(err){
+          console.error('[Firebase] init error:',err);
+          this.ready=false;
         }
       },
       subscribeOrders(cb){
         if(!this.ready) return;
-        onValue(this.ordersRef, (snap)=>{
+        onValue(this.ordersRef,(snap)=>{
           const val = snap.val() || {};
-          const arr = Object.entries(val).map(([id,data])=>({ id, ...data }))
-                       .sort((a,b)=>a.createdAt - b.createdAt);
-          cb(arr);
+          const arr = Object.entries(val).map(([id,data])=>({id,...data}))
+            .sort((a,b)=>a.createdAt-b.createdAt);
+          const h = JSON.stringify(arr.map(o=>[o.id,o.status,o.timeline?.length||0]));
+          if(h!==this.lastHash){ this.lastHash=h; cb(arr); } // chỉ render khi khác
         });
       },
       async pushOrder(order){
         if(!this.ready) return false;
-        try {
-          const newRef = push(this.ordersRef);
-          await set(newRef, { ...order, id: newRef.key });
+        try{
+          const r = push(this.ordersRef);
+          await set(r,{...order,id:r.key});
           return true;
-        } catch (e) { console.error(e); return false; }
+        }catch(e){ console.error(e); return false; }
       },
-      async updateStatus(orderId, status, timeline){
+      async updateStatus(orderId,status,timeline){
         if(!this.ready) return false;
-        try {
-          await update(ref(this.db, `orders/${orderId}`), { status, timeline });
-          return true;
-        } catch (e) { console.error(e); return false; }
+        try{ await update(ref(this.db,`orders/${orderId}`),{status,timeline}); return true; }
+        catch(e){ console.error(e); return false; }
+      },
+      async clearAllOrders(){
+        if(!this.ready) return false;
+        try{ await set(this.ordersRef,null); this.lastHash=null; return true; }
+        catch(e){ console.error(e); return false; }
       }
     };
 
     window.firebaseApi = firebaseApi;
 
-    (async () => {
+    (async()=>{
       await firebaseApi.init();
       if(firebaseApi.ready){
-        firebaseApi.subscribeOrders((ordersFromCloud)=>{
+        firebaseApi.subscribeOrders((orders)=>{
           try{
-            window.store.orders = ordersFromCloud;
+            window.store.orders = orders;
             if(typeof window.render === 'function') window.render();
           }catch(e){ console.error(e); }
         });
