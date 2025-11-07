@@ -2,10 +2,10 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiệm Nước Tụi Mình · POS + Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tiệm Nước Tụi Mình · POS</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- PapaParse for CSV -->
+  <!-- PapaParse để đọc CSV -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     .modal-enter{opacity:0;transform:translateY(6px)}
@@ -20,14 +20,13 @@
         <span class="text-2xl">🧋</span>
         <div>
           <h1 class="text-lg font-bold">Tiệm Nước Tụi Mình · POS</h1>
-          <p class="text-xs text-gray-500">HTML + Tailwind · Firebase Realtime</p>
+          <p class="text-xs text-gray-500">HTML + CSV · LocalStorage</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
         <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm">
           <option value="staff">Nhân viên (Gọi món)</option>
           <option value="barista">Quầy pha chế</option>
-          <option value="server">Nhân viên giao bàn</option>
           <option value="cashier">Thu ngân</option>
           <option value="admin">Quản lý</option>
         </select>
@@ -61,7 +60,9 @@
               <span class="font-semibold">Tổng</span>
               <span id="cartTotal" class="font-bold">0₫</span>
             </div>
-            <button id="btnSubmitOrder" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 mt-3">Gửi order đến quầy pha chế</button>
+            <button id="btnSubmitOrder" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 mt-3">
+              Gửi order đến quầy pha chế
+            </button>
           </section>
           <section class="bg-white rounded-2xl shadow-sm border p-5">
             <h2 class="text-xl font-semibold text-gray-900 mb-3">Đơn gần đây (chưa thanh toán)</h2>
@@ -84,22 +85,6 @@
         <div id="baristaByTable" class="grid md:grid-cols-2 gap-4"></div>
         <div id="baristaByItem" class="grid md:grid-cols-3 gap-4 hidden"></div>
       </section>
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">Đã sẵn sàng giao</h2>
-        <p class="text-sm text-gray-500">Chuyển sang vai trò "Nhân viên giao bàn" để xử lý giao món.</p>
-      </section>
-    </section>
-
-    <!-- SERVER -->
-    <section id="view-server" class="hidden grid md:grid-cols-2 gap-6">
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-3">Món đã sẵn sàng</h2>
-        <div id="readyList" class="space-y-3"></div>
-      </section>
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-3">Đã giao · chờ thanh toán</h2>
-        <div id="deliveredList" class="space-y-3"></div>
-      </section>
     </section>
 
     <!-- CASHIER -->
@@ -108,19 +93,11 @@
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Chờ thanh toán</h2>
         <div id="cashierNotPaid" class="space-y-3"></div>
       </section>
+
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-xl font-semibold text-gray-900">Đã thanh toán hôm nay</h2>
           <span id="cashierTotalToday" class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700"></span>
-        </div>
-        <div id="cashierPaid" class="grid md:grid-cols-2 gap-3"></div>
-      </section>
-
-      <!-- Revenue table + export -->
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-xl font-semibold text-gray-900">Báo cáo doanh thu hôm nay</h2>
-          <button id="btnExportToday" class="px-3 py-1 rounded-lg border">Tải CSV</button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -136,53 +113,23 @@
             <tbody id="revTodayBody"></tbody>
           </table>
         </div>
+        <div class="mt-3 text-right">
+          <button id="btnExportToday" class="px-3 py-1 rounded-lg border">Tải CSV</button>
+        </div>
       </section>
     </section>
 
-    <!-- ADMIN + DASHBOARD -->
+    <!-- ADMIN -->
     <section id="view-admin" class="hidden grid md:grid-cols-2 gap-6">
-      <!-- Dashboard -->
-      <section class="bg-white rounded-2xl shadow-sm border p-5 md:col-span-2">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xl font-semibold text-gray-900">Dashboard (Realtime)</h2>
-          <span class="text-xs text-gray-500">Tự cập nhật</span>
-        </div>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Tổng đơn hàng</p>
-            <p id="kpiOrders" class="text-3xl font-bold">—</p>
-          </div>
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Dung lượng ước tính</p>
-            <p class="text-lg font-semibold"><span id="kpiStorage">—</span> <span class="text-xs text-gray-500">/ 1 GB</span></p>
-            <div class="mt-2 w-full bg-gray-100 rounded-full h-2"><div id="kpiStorageBar" class="h-2 rounded-full bg-emerald-500" style="width:0%"></div></div>
-            <p id="kpiStoragePct" class="text-xs text-gray-500 mt-1">0%</p>
-          </div>
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Thiết bị đang online</p>
-            <p id="kpiOnline" class="text-3xl font-bold">—</p>
-          </div>
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Ước tính tải xuống / tháng</p>
-            <p class="text-lg font-semibold"><span id="kpiBandwidth">—</span> <span class="text-xs text-gray-500">/ 10 GB</span></p>
-            <div class="mt-2 w-full bg-gray-100 rounded-full h-2"><div id="kpiBandwidthBar" class="h-2 rounded-full bg-indigo-500" style="width:0%"></div></div>
-            <p id="kpiBandwidthPct" class="text-xs text-gray-500 mt-1">0%</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Config -->
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Cấu hình quán</h2>
         <label class="text-sm text-gray-700">Số lượng bàn</label>
         <input id="tablesInput" type="number" min="1" class="border rounded-lg px-3 py-2 w-40" />
+        <p class="text-xs text-gray-500 mt-2">CSV: <code>assets/menu.csv</code> · Cột: Category, Item, Size, Price</p>
       </section>
       <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-3">Menu (JSON)</h2>
-        <textarea id="menuTextarea" class="w-full h-80 border rounded-xl p-3 font-mono text-sm"></textarea>
-        <div class="mt-3">
-          <button id="btnSaveAdmin" class="px-4 py-2 rounded-lg bg-black text-white">Lưu thay đổi</button>
-        </div>
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Menu (JSON xem nhanh)</h2>
+        <textarea id="menuTextarea" class="w-full h-80 border rounded-xl p-3 font-mono text-sm" readonly></textarea>
       </section>
     </section>
   </main>
@@ -211,61 +158,51 @@
   <audio id="newOrderSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 
   <script>
-    // ===== CSV MENU =====
-    const CSV_PATH = 'assets/menu.csv'; // columns: Category,Item,Size,Price (+Topping rows)
+    /* ================== CORE ================== */
+    const CSV_PATH = 'assets/menu.csv';
+    const STORAGE_KEY = 'tn_pos_v2';
+    const ROLES = ['staff','barista','cashier','admin'];
+
     function slugify(str){
       return String(str||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
         .replace(/[^a-zA-Z0-9\\s-]/g,'').trim().replace(/\\s+/g,'_').toLowerCase();
     }
     function parsePrice(v){ if(typeof v==='number') return v; const s=String(v||'').replace(/[^\\d]/g,''); return s?Number(s):0; }
-    function rowToMenuItem(row){
-      const category = (row.Category||'Other').toString().trim();
-      const baseName = (row.Item||'').toString().trim(); if(!baseName) return null;
-      const size = (row.Size||'').toString().trim();
-      const name = size ? \`\${baseName} (\${size})\` : baseName;
-      const price = parsePrice(row.Price);
-      const id = slugify(name)||('itm_'+Math.random().toString(36).slice(2,8));
-      return { id, name, price, category };
-    }
-    async function fetchCSVMenu(){
-      const res = await fetch(CSV_PATH, { cache:'no-store' }); const text = await res.text();
-      const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-      const rows = Array.isArray(parsed.data) ? parsed.data : [];
-      return rows.map(rowToMenuItem).filter(Boolean);
-    }
-
-    // ===== CORE HELPERS =====
-    const STORAGE_KEY = 'tiemnuoctuiminh_pos_v1_html';
     function money(n){ return n.toLocaleString('vi-VN')+'₫'; }
     function now(){ return Date.now(); }
-    function newId(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
-    function calcPriority(items){ return items.reduce((s,it)=>s+it.qty,0); }
-    function shortId(id){ return id ? id.slice(-4) : ''; }
-    function fmtTime(ts){ try{ return new Date(ts).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); } catch{ return ''; } }
-    function isToday(ts){ const d=new Date(ts), t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate(); }
+    function newId(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
+    function shortId(id){ return id? id.slice(-4):''; }
+    function fmtTime(ts){ return new Date(ts).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); }
+    function isToday(ts){ const d=new Date(ts), t=new Date(); return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate(); }
 
-    // local shadow (menu,tables) để load nhanh
+    // state
+    let store = loadStore();
+    let role = 'staff';
+    let baristaTab = 'by-table';
+    let tablePicking = 1;
+    let viewingOrderId = null;
+
+    // cart: { id: { qty, note, toppings:[{id,name,price,qty}] } }
+    let cart = {};
+    function ensureCartItem(id){ if(!cart[id]) cart[id]={qty:0,note:'',toppings:[]}; return cart[id]; }
+
     function loadStore(){
       try{
         const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return { menu: [], orders: [], tables: 20 };
-        const parsed = JSON.parse(raw);
-        return { menu: parsed.menu||[], orders: [], tables: parsed.tables||20 };
-      }catch{ return { menu: [], orders: [], tables: 20 }; }
+        if(!raw) return { menu: [], orders: [], tables: 12 };
+        const p = JSON.parse(raw);
+        return { menu: p.menu||[], orders: p.orders||[], tables: p.tables||12 };
+      }catch{ return { menu: [], orders: [], tables: 12 }; }
     }
-    function saveLocalOnly(){
-      const shadow = { menu: store.menu, orders: [], tables: store.tables };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(shadow));
-      if(bc) bc.postMessage({ type:'store:update', store: shadow });
-    }
+    function saveStore(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
 
+    // elements
     const els = {
       roleSelect: document.getElementById('roleSelect'),
       btnResetData: document.getElementById('btnResetData'),
-      views: {
+      views:{
         staff: document.getElementById('view-staff'),
         barista: document.getElementById('view-barista'),
-        server: document.getElementById('view-server'),
         cashier: document.getElementById('view-cashier'),
         admin: document.getElementById('view-admin'),
       },
@@ -278,18 +215,20 @@
       cartTotal: document.getElementById('cartTotal'),
       btnSubmitOrder: document.getElementById('btnSubmitOrder'),
       recentOrders: document.getElementById('recentOrders'),
+      // barista
       tabByTable: document.getElementById('tabByTable'),
       tabByItem: document.getElementById('tabByItem'),
       baristaByTable: document.getElementById('baristaByTable'),
       baristaByItem: document.getElementById('baristaByItem'),
-      readyList: document.getElementById('readyList'),
-      deliveredList: document.getElementById('deliveredList'),
+      // cashier
       cashierNotPaid: document.getElementById('cashierNotPaid'),
-      cashierPaid: document.getElementById('cashierPaid'),
       cashierTotalToday: document.getElementById('cashierTotalToday'),
+      revTodayBody: document.getElementById('revTodayBody'),
+      btnExportToday: document.getElementById('btnExportToday'),
+      // admin
       tablesInput: document.getElementById('tablesInput'),
       menuTextarea: document.getElementById('menuTextarea'),
-      btnSaveAdmin: document.getElementById('btnSaveAdmin'),
+      // pay modal
       payModal: document.getElementById('payModal'),
       payTitle: document.getElementById('payTitle'),
       payLines: document.getElementById('payLines'),
@@ -297,159 +236,66 @@
       btnClosePay: document.getElementById('btnClosePay'),
       btnCancelPay: document.getElementById('btnCancelPay'),
       btnConfirmPay: document.getElementById('btnConfirmPay'),
-      // kpi
-      kpiOrders: document.getElementById('kpiOrders'),
-      kpiStorage: document.getElementById('kpiStorage'),
-      kpiStorageBar: document.getElementById('kpiStorageBar'),
-      kpiStoragePct: document.getElementById('kpiStoragePct'),
-      kpiOnline: document.getElementById('kpiOnline'),
-      kpiBandwidth: document.getElementById('kpiBandwidth'),
-      kpiBandwidthBar: document.getElementById('kpiBandwidthBar'),
-      kpiBandwidthPct: document.getElementById('kpiBandwidthPct'),
     };
 
-    let store = loadStore();
-    window.store = store;
-    // cart: { [menuId]: { qty, note, toppings: [{id,name,price,qty}] } }
-    let cart = {};
-    function ensureCartItem(id){ if(!cart[id]) cart[id]={qty:0,note:'',toppings:[]}; return cart[id]; }
-    let role = 'staff';
-    let baristaTab = 'by-table';
-    let tablePicking = 1;
-    let viewingOrderId = null;
-
-    // BroadcastChannel sync cùng thiết bị
-    const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('tiem_nuoc_tui_minh_sync') : null;
-    if(bc){
-      bc.addEventListener('message', e=>{
-        if(e?.data?.type==='store:update'){
-          store = { ...store, ...e.data.store };
-          render();
-        }
-      });
+    /* ================== MENU (CSV) ================== */
+    function rowToMenuItem(row){
+      const category = (row.Category||'Other').toString().trim();
+      const baseName = (row.Item||'').toString().trim(); if(!baseName) return null;
+      const size = (row.Size||'').toString().trim();
+      const name = size ? \`\${baseName} (\${size})\` : baseName;
+      const price = parsePrice(row.Price);
+      const id = slugify(name)||('itm_'+Math.random().toString(36).slice(2,8));
+      return { id, name, price, category };
+    }
+    async function loadCSV(){
+      try{
+        const res = await fetch(CSV_PATH, {cache:'no-store'});
+        const text = await res.text();
+        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+        const rows = Array.isArray(parsed.data) ? parsed.data : [];
+        const items = rows.map(rowToMenuItem).filter(Boolean);
+        if(items.length){ store.menu = items; saveStore(); }
+      }catch(e){ console.warn('Không đọc được CSV:', e); }
     }
 
-    // Nhận role từ URL/hash/path
-    const ROLES = ['staff','barista','server','cashier','admin'];
-    const qRole = new URLSearchParams(location.search).get('role');
-    const hRaw = location.hash.replace(/^#/, '');
-    const hRole = new URLSearchParams(hRaw).get('role') || hRaw;
-    const pRole = location.pathname.split('/').filter(Boolean).pop();
-    [qRole,hRole,pRole].some(c=>{
-      const r = String(c||'').toLowerCase();
-      if(ROLES.includes(r)){ role = r; return true; }
-      return false;
-    });
-    try{ const savedRole = sessionStorage.getItem('tn_role'); if(savedRole) role = savedRole; }catch{}
-    function persistRole(){ try{ sessionStorage.setItem('tn_role', role); }catch{} }
-
-    function setRole(r){ role = r; persistRole(); render(); }
+    /* ================== HELPERS ================== */
     function statusLabel(s){ return ({queued:'Chờ pha',brewing:'Đang pha',ready:'Sẵn sàng',delivered:'Đã giao',paid:'Đã thanh toán'})[s]||s; }
     function calcOrderTotal(o){
       return o.items.reduce((t,it)=> t + it.price*it.qty + (it.toppings||[]).reduce((s,tp)=>s+tp.price*tp.qty,0), 0);
     }
-
-    // ====== QUEUES (ưu tiên theo thời gian) ======
     function getQueues(){
-      const notPaid = store.orders.filter(o => o.status !== 'paid');
-      const byTimeAsc = (a,b) => a.createdAt - b.createdAt;
-
-      const brewing = notPaid.filter(o=>['queued','brewing'].includes(o.status)).sort(byTimeAsc);
-      const ready   = notPaid.filter(o=>o.status==='ready').sort(byTimeAsc);
-      const delivered = notPaid.filter(o=>o.status==='delivered').sort(byTimeAsc);
-
-      // nhóm theo bàn + đánh dấu bổ sung
-      const groupByTable = (arr)=>{
-        const m = new Map();
-        arr.forEach(o=>{
-          const list = m.get(o.table) || [];
-          list.push(o);
-          m.set(o.table, list);
-        });
-        for(const [k, list] of m.entries()){
-          list.sort(byTimeAsc).forEach((o, idx)=>{ o.__addonIndex = idx; });
-          m.set(k, list);
-        }
-        return m;
-      };
-
-      return { brewing, ready, delivered, notPaid, brewingByTable: groupByTable(brewing) };
+      const notPaid = store.orders.filter(o => o.status!=='paid').sort((a,b)=>a.createdAt-b.createdAt);
+      const brewing = notPaid.filter(o=>['queued','brewing'].includes(o.status));
+      const delivered = notPaid.filter(o=>o.status==='delivered');
+      return { brewing, delivered };
     }
-
-    // ====== MUTATIONS ======
-    function setStatus(orderId, status){
-      if(window.firebaseApi?.ready){
-        const o = store.orders.find(x=>x.id===orderId); if(!o) return;
-        const timeline = [...(o.timeline||[]), {status, ts: now()}];
-        window.firebaseApi.updateStatus(orderId,status,timeline).then(ok=>{
-          if(!ok) alert('Không thể cập nhật trạng thái lên cloud');
-        });
-        return;
-      }
-      // local
-      store.orders = store.orders.map(o=> o.id===orderId ? {...o,status,timeline:[...(o.timeline||[]),{status,ts:now()}]} : o);
-      saveLocalOnly(); render();
-    }
-    function payOrder(orderId){ setStatus(orderId,'paid'); closePay(); }
-
-    function resetData(){
-      if(!confirm('Xoá toàn bộ đơn hàng trên cloud?')) return;
-      cart = {};
-      store.orders = [];
-      if(window.firebaseApi?.ready){
-        window.firebaseApi.clearAllOrders().then(()=>{ saveLocalOnly(); render(); });
-      }else{
-        saveLocalOnly(); render();
-      }
-    }
-
-    // Staff actions
-    function addToCart(id){ const it=ensureCartItem(id); it.qty++; renderStaff(); }
-    function decFromCart(id){ const it=cart[id]; if(!it) return; it.qty=Math.max(0,it.qty-1); if(it.qty===0) delete cart[id]; renderStaff(); }
-
     function getToppings(){ return (store.menu||[]).filter(m=>/topping/i.test(m.category)); }
 
-    function submitOrder(){
-      const items = Object.entries(cart).map(([id,ci])=>{
-        const mi = store.menu.find(m=>m.id===id);
-        if(!mi || ci.qty<=0) return null;
-        return {
-          menuItemId:id, name:mi.name, price:mi.price, qty:ci.qty,
-          note: ci.note||'',
-          toppings: (ci.toppings||[]).map(t=>({ id:t.id, name:t.name, price:t.price, qty:t.qty })),
-          served: 0
-        };
-      }).filter(Boolean);
-      if(items.length===0) return alert('Giỏ hàng trống');
-
-      const order = {
-        id:newId('ord'),
-        table: (String(tablePicking)==='TA' ? 'TA' : Number(tablePicking)),
-        takeaway: String(tablePicking)==='TA',
-        items,
-        priority: calcPriority(items),
-        createdAt: now(),
-        status:'queued',
-        timeline:[{status:'queued',ts:now()}]
-      };
-
-      if(window.firebaseApi?.ready){
-        window.firebaseApi.pushOrder(order).then(ok=>{
-          if(!ok) return alert('Không thể gửi đơn lên cloud');
-          cart={}; saveLocalOnly(); render();
-          document.getElementById('recentOrders')?.scrollIntoView({behavior:'smooth', block:'start'});
-        });
-        return;
+    function setStatus(orderId, status){
+      store.orders = store.orders.map(o => o.id===orderId
+        ? {...o,status, timeline:[...(o.timeline||[]), {status, ts: now()}]}
+        : o);
+      saveStore(); render();
+    }
+    function serveItem(orderId, itemIndex, amount=1){
+      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
+      const it = o.items[itemIndex]; if(!it) return;
+      it.served = Math.min(it.qty, (it.served||0)+amount);
+      const allServed = o.items.every(x => (x.served||0) >= x.qty);
+      if(allServed && o.status!=='paid'){
+        o.status='delivered';
+        o.timeline=[...(o.timeline||[]),{status:'delivered',ts:now()}];
+      }else if(o.status==='queued'){
+        o.status='brewing';
       }
-      // local
-      store.orders.push(order); cart={}; saveLocalOnly(); render();
-      document.getElementById('recentOrders')?.scrollIntoView({behavior:'smooth', block:'start'});
+      saveStore(); render();
     }
 
-    function openPay(id){
-      viewingOrderId = id;
-      const o = store.orders.find(x=>x.id===id); if(!o) return;
-      els.payTitle.textContent = `Thanh toán · ${o.table==='TA'?'TA (Mang về)':('Bàn '+o.table)}`;
+    function openPay(orderId){
+      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
+      viewingOrderId = orderId;
+      els.payTitle.textContent = `Thanh toán · ${o.table==='TA'?'TA (Mang về)':'Bàn '+o.table}`;
       els.payLines.innerHTML = o.items.map(it=>{
         const tops = (it.toppings||[]).map(t=>`<div class="flex justify-between text-xs text-gray-600"><span>• ${t.name} × ${t.qty}</span><span>${money(t.price*t.qty)}</span></div>`).join('');
         return `<div class="flex items-start justify-between">
@@ -460,87 +306,36 @@
       els.payTotal.textContent = money(calcOrderTotal(o));
       els.payModal.classList.remove('hidden'); els.payModal.classList.add('flex');
       requestAnimationFrame(()=> els.payModal.querySelector('.modal-enter')?.classList.add('modal-enter-active'));
-      els.btnConfirmPay.onclick = ()=>{ if(viewingOrderId) payOrder(viewingOrderId); };
+      els.btnConfirmPay.onclick = ()=>{ setStatus(orderId,'paid'); closePay(); };
     }
     function closePay(){
-      viewingOrderId = null;
       els.payModal.classList.add('hidden'); els.payModal.classList.remove('flex');
       els.payModal.querySelector('.modal-enter')?.classList.remove('modal-enter-active');
+      viewingOrderId = null;
     }
 
-    function openPayTable(tableNumber){
-      const list = store.orders
-        .filter(o => o.table===tableNumber && o.status==='delivered')
-        .sort((a,b)=>a.createdAt-b.createdAt);
-      if(list.length===0) return;
-
-      els.payTitle.textContent = `Thanh toán · Bàn ${tableNumber} (${list.length} đơn)`;
-      els.payLines.innerHTML = list.map(o=>`
-        <div class="border rounded-lg p-2">
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600">#${shortId(o.id)} · ${fmtTime(o.createdAt)}</span>
-            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
-          </div>
-          <div class="mt-1 space-y-1">
-            ${o.items.map(it=>{
-              const tops=(it.toppings||[]).map(t=>`(+ ${t.name}×${t.qty})`).join(', ');
-              return `<div class="flex items-center justify-between">
-                <span>${it.name} × ${it.qty} ${tops?'<span class="text-xs text-gray-500">'+tops+'</span>':''}</span>
-                <span class="font-medium">${money(it.price*it.qty)}</span>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>`).join('');
-
-      const total = list.reduce((s,o)=> s + calcOrderTotal(o), 0);
-      els.payTotal.textContent = money(total);
-      els.payModal.classList.remove('hidden'); els.payModal.classList.add('flex');
-      requestAnimationFrame(()=> els.payModal.querySelector('.modal-enter')?.classList.add('modal-enter-active'));
-      els.btnConfirmPay.onclick = ()=> payTable(tableNumber);
+    // Toast + sound cho đơn mới
+    let knownOrderIds = new Set(store.orders.map(o=>o.id));
+    function showToast(html){
+      const host = document.getElementById('toastHost');
+      const box = document.createElement('div');
+      box.className = 'bg-black/80 text-white text-sm rounded-xl px-3 py-2 shadow';
+      box.innerHTML = html + ' <button class="ml-2 text-xs opacity-70 hover:opacity-100" data-x>✕</button>';
+      host.appendChild(box);
+      const snd = document.getElementById('newOrderSound'); try{ snd.currentTime=0; snd.play().catch(()=>{});}catch{}
+      const kill = ()=>box.remove(); box.querySelector('[data-x]').addEventListener('click', kill);
+      setTimeout(kill, 3000);
     }
-    function payTable(tableNumber){
-      const ids = store.orders.filter(o => o.table===tableNumber && o.status==='delivered').map(o=>o.id);
-      if(ids.length===0){ closePay(); return; }
-
-      if(window.firebaseApi?.ready){
-        Promise.all(ids.map(id=>{
-          const o = store.orders.find(x=>x.id===id);
-          const timeline = [...(o?.timeline||[]), {status:'paid', ts: now()}];
-          return window.firebaseApi.updateStatus(id,'paid',timeline);
-        })).then(()=>{ closePay(); });
-      }else{
-        store.orders = store.orders.map(o => (o.table===tableNumber && o.status==='delivered'
-          ? {...o,status:'paid',timeline:[...(o.timeline||[]),{status:'paid',ts:now()}]}
-          : o));
-        closePay(); render();
-      }
+    function toastNewOrders(){
+      store.orders.forEach(o=>{
+        if(!knownOrderIds.has(o.id) && o.status==='queued'){
+          showToast(`🧾 Đơn mới #${shortId(o.id)} · ${o.table==='TA'?'Mang về':'Bàn '+o.table}`);
+        }
+      });
+      knownOrderIds = new Set(store.orders.map(o=>o.id));
     }
 
-    function persistOrdersChange(){
-      if(window.firebaseApi?.ready){
-        store.orders.forEach(o=>{
-          window.firebaseApi.updateStatus(o.id, o.status, o.timeline||[]);
-        });
-      }else{
-        saveLocalOnly();
-      }
-    }
-    function serveItem(orderId, itemIndex, amount=1, silent){
-      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
-      const it = o.items[itemIndex]; if(!it) return;
-      it.served = Math.min(it.qty, (it.served||0) + Math.max(0,amount));
-      const allServed = o.items.every(x => (x.served||0) >= x.qty);
-      if(allServed && o.status!=='paid'){
-        o.status = 'delivered';
-        o.timeline = [...(o.timeline||[]), {status:'delivered', ts:now()}];
-      }else if(o.status==='queued'){
-        o.status = 'brewing';
-      }
-      persistOrdersChange();
-      if(!silent) render();
-    }
-
-    // ====== RENDERERS ======
+    /* ================== RENDER ================== */
     function renderRole(){
       Object.values(els.views).forEach(v=>v.classList.add('hidden'));
       els.views[role].classList.remove('hidden');
@@ -548,29 +343,21 @@
     }
 
     function renderStaff(){
-      // BÀN
       els.tableSelect.innerHTML =
-        `<option value="TA">Mang về (Takeaway)</option>` +
-        Array.from({length: store.tables})
-          .map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
+        `<option value="TA">Mang về (TA)</option>` +
+        Array.from({length: store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
       els.tableSelect.value = String(tablePicking);
       els.cartTitle.textContent = `Giỏ hàng · ${tablePicking==='TA'?'Mang về':('Bàn '+tablePicking)}`;
 
-      // CATEGORY giữ lựa chọn
       const prevCat = els.catFilter.value || 'All';
       const cats = ['All', ...new Set((store.menu||[]).map(m=>m.category))];
       els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
       els.catFilter.value = cats.includes(prevCat) ? prevCat : 'All';
 
-      // LỌC
       const kw = (els.searchInput.value||'').toLowerCase();
       const cat = els.catFilter.value || 'All';
-      const list = (store.menu||[]).filter(m =>
-        (cat==='All' || m.category===cat) &&
-        (!kw || m.name.toLowerCase().includes(kw))
-      );
+      const list = (store.menu||[]).filter(m => (cat==='All'||m.category===cat) && (!kw || m.name.toLowerCase().includes(kw)));
 
-      // HIỂN THỊ MENU
       els.menuGrid.innerHTML = list.map(m=>`
         <div class="border rounded-xl p-4 hover:shadow-sm bg-white">
           <div class="flex items-start justify-between gap-3">
@@ -580,30 +367,25 @@
             </div>
             <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${money(m.price)}</span>
           </div>
-          <div class="mt-3 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button data-dec="${m.id}" class="px-2 py-1 border rounded">-</button>
-              <span class="w-8 text-center">${(cart[m.id]?.qty)||0}</span>
-              <button data-inc="${m.id}" class="px-2 py-1 border rounded">+</button>
+          <div class="mt-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <button data-dec="${m.id}" class="px-2 py-1 border rounded">-</button>
+                <span class="w-8 text-center">${(cart[m.id]?.qty)||0}</span>
+                <button data-inc="${m.id}" class="px-2 py-1 border rounded">+</button>
+              </div>
+              <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
             </div>
-            <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
           </div>
         </div>
       `).join('');
 
-      // events +/-
-      els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc'))));
-      els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec'))));
-      els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>{
-        const id = e.target.getAttribute('data-add');
-        const it = ensureCartItem(id);
-        if(it.qty===0) it.qty=1;
-        renderCart();
-      }));
+      els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-inc');ensureCartItem(id).qty++; renderCart();}));
+      els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-dec');const it=cart[id]; if(!it) return; it.qty=Math.max(0,it.qty-1); if(it.qty===0) delete cart[id]; renderCart();}));
+      els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-add');const it=ensureCartItem(id); if(it.qty===0) it.qty=1; renderCart();}));
 
       renderCart();
 
-      // recent
       const listRecent = store.orders.filter(o=>o.status!=='paid').sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
       els.recentOrders.innerHTML = listRecent.map(o=>`
         <div class="flex items-center justify-between border rounded-lg p-3">
@@ -620,16 +402,13 @@
       if(ids.length===0){ els.cartList.textContent='Chưa có món.'; els.cartTotal.textContent='0₫'; return; }
 
       const toppingOpts = getToppings().map(t=>`<option value="${t.id}">${t.name} (+${money(t.price)})</option>`).join('');
-
       els.cartList.innerHTML = ids.map(id=>{
         const mi = store.menu.find(m=>m.id===id); if(!mi) return '';
         const ci = cart[id];
-        const toppingsHtml = (ci.toppings||[]).map(tp=>`
+        const tops = (ci.toppings||[]).map(tp=>`
           <div class="flex items-center justify-between text-xs text-gray-600">
-            <span>• ${tp.name} × ${tp.qty}</span>
-            <span>${money(tp.price*tp.qty)}</span>
+            <span>• ${tp.name} × ${tp.qty}</span><span>${money(tp.price*tp.qty)}</span>
           </div>`).join('');
-
         return `
         <div class="border rounded-lg p-3 space-y-2">
           <div class="flex items-center justify-between">
@@ -643,12 +422,7 @@
               <button data-inc-cart="${id}" class="px-2 py-1 border rounded">+</button>
             </div>
           </div>
-
-          <div class="flex items-center gap-2">
-            <input data-note="${id}" class="border rounded px-2 py-1 text-xs w-full"
-                  placeholder="Ghi chú cho món này..." value="${ci.note||''}" />
-          </div>
-
+          <input data-note="${id}" class="border rounded px-2 py-1 text-xs w-full" placeholder="Ghi chú cho món này..." value="${ci.note||''}">
           <div class="flex items-center gap-2">
             <select data-addtp="${id}" class="border rounded px-2 py-1 text-xs">
               <option value="">+ Thêm topping</option>
@@ -656,17 +430,13 @@
             </select>
             <button data-cleartp="${id}" class="text-xs border px-2 py-1 rounded">Xoá topping</button>
           </div>
-
-          ${toppingsHtml ? `<div class="pt-1 border-t">${toppingsHtml}</div>` : ''}
+          ${tops?`<div class="pt-1 border-t">${tops}</div>`:''}
         </div>`;
       }).join('');
 
-      // events
-      els.cartList.querySelectorAll('[data-dec-cart]').forEach(b=>b.addEventListener('click',e=>decFromCart(e.target.getAttribute('data-dec-cart'))));
-      els.cartList.querySelectorAll('[data-inc-cart]').forEach(b=>b.addEventListener('click',e=>addToCart(e.target.getAttribute('data-inc-cart'))));
-      els.cartList.querySelectorAll('[data-note]').forEach(inp=>inp.addEventListener('input', e=>{
-        const id=e.target.getAttribute('data-note'); ensureCartItem(id).note=e.target.value;
-      }));
+      els.cartList.querySelectorAll('[data-dec-cart]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-dec-cart'); const it=cart[id]; if(!it) return; it.qty=Math.max(0,it.qty-1); if(it.qty===0) delete cart[id]; renderCart();}));
+      els.cartList.querySelectorAll('[data-inc-cart]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-inc-cart'); ensureCartItem(id).qty++; renderCart();}));
+      els.cartList.querySelectorAll('[data-note]').forEach(inp=>inp.addEventListener('input', e=>{ const id=e.target.getAttribute('data-note'); ensureCartItem(id).note=e.target.value; }));
       els.cartList.querySelectorAll('[data-addtp]').forEach(sel=>sel.addEventListener('change', e=>{
         const id=e.target.getAttribute('data-addtp'); const tpId=e.target.value; if(!tpId) return;
         const tp = getToppings().find(t=>t.id===tpId); if(!tp) return;
@@ -675,11 +445,9 @@
         if(ex) ex.qty++; else ci.toppings.push({id:tp.id,name:tp.name,price:tp.price,qty:1});
         e.target.value=''; renderCart();
       }));
-      els.cartList.querySelectorAll('[data-cleartp]').forEach(b=>b.addEventListener('click', e=>{
-        const id=e.target.getAttribute('data-cleartp'); const ci=cart[id]; if(ci){ ci.toppings=[]; renderCart(); }
-      }));
+      els.cartList.querySelectorAll('[data-cleartp]').forEach(b=>b.addEventListener('click', e=>{ const id=e.target.getAttribute('data-cleartp'); const ci=cart[id]; if(ci){ ci.toppings=[]; renderCart(); } }));
 
-      // total
+      // tổng tiền
       const total = ids.reduce((sum,id)=>{
         const mi=store.menu.find(m=>m.id===id); const ci=cart[id];
         const core = mi ? mi.price*ci.qty : 0;
@@ -696,14 +464,17 @@
       els.tabByItem.classList.toggle('bg-black', baristaTab==='by-item');
       els.tabByItem.classList.toggle('text-white', baristaTab==='by-item');
 
-      const { brewing, brewingByTable } = getQueues();
+      const { brewing } = getQueues();
 
-      // Tính thứ tự hàng đợi (đơn sớm có số nhỏ)
-      const brewingAll = brewing.slice().sort((a,b)=> a.createdAt - b.createdAt);
-      const qpos = new Map(brewingAll.map((o,i)=>[o.id, i+1])); // id -> thứ tự
+      // nhóm theo bàn
+      const map = new Map();
+      brewing.forEach(o=>{
+        const list = map.get(o.table) || [];
+        list.push(o); map.set(o.table, list);
+      });
 
       // BY TABLE
-      const entries = Array.from(brewingByTable.entries()).sort((a,b)=> a[0]-b[0]);
+      const entries = Array.from(map.entries()).sort((a,b)=> (a[0]+'' ).localeCompare(b[0]+''));
       els.baristaByTable.innerHTML = entries.map(([table,orders])=>`
         <div class="border rounded-xl p-4">
           <div class="flex items-center justify-between mb-2">
@@ -712,17 +483,9 @@
           </div>
           <div class="space-y-3">
             ${orders.map(o=>`
-              <div class="border rounded-lg p-3 ${o.takeaway?'ring-2 ring-yellow-300':''}">
+              <div class="border rounded-lg p-3 ${o.table==='TA'?'ring-2 ring-yellow-300':''}">
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-full bg-black text-white text-xs grid place-items-center font-semibold">
-                      ${qpos.get(o.id) || ''}
-                    </span>
-                    <p class="text-sm text-gray-500">
-                      #${shortId(o.id)} · ${o.__addonIndex>0?'Bổ sung':'Đơn đầu'} · ${fmtTime(o.createdAt)}
-                      ${o.takeaway? '<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-900">Mang về</span>':''}
-                    </p>
-                  </div>
+                  <div class="text-sm text-gray-500">#${shortId(o.id)} · ${o.__addonIndex>0?'Bổ sung':'Đơn đầu'} · ${fmtTime(o.createdAt)}</div>
                   <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
                 </div>
                 <ul class="mt-2 text-sm space-y-1">
@@ -734,14 +497,14 @@
                         ${Array.isArray(it.toppings)&&it.toppings.length? `<span class="ml-1 text-xs text-indigo-700 bg-indigo-100 px-1 rounded">+ ${it.toppings.map(t=>`${t.name}×${t.qty}`).join(', ')}</span>`:''}
                       </div>
                       <div class="flex items-center gap-1">
-                        <button data-serve-one="${o.id}|${idx}" class="px-2 py-0.5 text-xs border rounded">Giao 1</button>
+                        <button data-serve-one="${o.id}|${idx}" class="px-2 py-0.5 text-xs border rounded">Đã giao 1</button>
                         <button data-serve-all="${o.id}|${idx}" class="px-2 py-0.5 text-xs border rounded">Giao hết món</button>
                         <span class="text-xs text-gray-500">Đã giao: ${it.served||0}</span>
                       </div>
                     </li>`).join('')}
                 </ul>
                 <div class="mt-3 flex gap-2">
-                  ${o.status==='queued'  ? `<button data-start="${o.id}" class="px-3 py-1 rounded-lg bg-amber-600 text-white">Bắt đầu pha</button>`:''}
+                  ${o.status==='queued' ? `<button data-start="${o.id}" class="px-3 py-1 rounded-lg bg-amber-600 text-white">Bắt đầu pha</button>`:''}
                   ${o.status!=='paid' ? `<button data-serve-order="${o.id}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Giao hết đơn</button>`:''}
                 </div>
               </div>
@@ -763,8 +526,7 @@
       els.baristaByTable.querySelectorAll('[data-serve-order]').forEach(b=>b.addEventListener('click', e=>{
         const oid = e.target.getAttribute('data-serve-order');
         const o = store.orders.find(x=>x.id===oid); if(!o) return;
-        o.items.forEach((it,idx)=> serveItem(oid, idx, (it.qty - (it.served||0)), true));
-        render();
+        o.items.forEach((it,idx)=> serveItem(oid, idx, (it.qty - (it.served||0))));
       }));
 
       // BY ITEM (tổng hợp)
@@ -772,133 +534,84 @@
       brewing.forEach(o=>{
         o.items.forEach(it=>{
           const cur = agg.get(it.menuItemId) || {name:it.name,totalQty:0,rows:[]};
-          cur.totalQty += (it.qty - (it.served||0));
-          cur.rows.push({table:o.table,id:o.id,ts:o.createdAt,qty:(it.qty - (it.served||0)),addonIndex:o.__addonIndex||0, q: (new Map(brewing.map((x,i)=>[x.id,i+1]))).get(o.id)||null});
+          cur.totalQty += (it.qty-(it.served||0));
+          cur.rows.push({table:o.table,id:o.id,ts:o.createdAt,qty:(it.qty-(it.served||0)),addonIndex:o.__addonIndex||0});
           agg.set(it.menuItemId, cur);
         });
       });
-      const rows = Array.from(agg.entries()).map(([id,v])=>({ id, ...v })).sort((a,b)=> b.totalQty - a.totalQty);
-
+      const rows = Array.from(agg.entries()).map(([id,v])=>({id,...v})).sort((a,b)=>b.totalQty-a.totalQty);
       els.baristaByItem.innerHTML = rows.map(r=>`
         <div class="border rounded-xl p-4">
-          <div class="flex items-center justify-between">
-            <h4 class="font-semibold">${r.name}</h4>
-            <span class="text-sm font-bold">${r.totalQty}</span>
-          </div>
+          <div class="flex items-center justify-between"><h4 class="font-semibold">${r.name}</h4><span class="text-sm font-bold">${r.totalQty}</span></div>
           <div class="mt-2 text-xs text-gray-600 space-y-1">
-            ${r.rows.map(x=>`
-              <div class="flex items-center gap-2">
-                <span class="w-6 h-6 rounded-full bg-black text-white grid place-items-center text-[10px]">${x.q??''}</span>
-                <span>${x.table==='TA'?'TA':'Bàn '+x.table} · #${shortId(x.id)} ${x.addonIndex>0?'· Bổ sung':''} · ${fmtTime(x.ts)} · ×${x.qty}</span>
-              </div>
-            `).join('')}
+            ${r.rows.map(x=>`<div>${x.table==='TA'?'TA':'Bàn '+x.table} · #${shortId(x.id)} ${x.addonIndex>0?'· Bổ sung':''} · ${fmtTime(x.ts)} · ×${x.qty}</div>`).join('')}
           </div>
         </div>`).join('');
 
-      // toggle
       els.baristaByTable.classList.toggle('hidden', baristaTab!=='by-table');
-      els.baristaByItem.classList.toggle('hidden',  baristaTab!=='by-item');
+      els.baristaByItem.classList.toggle('hidden', baristaTab!=='by-item');
     }
-
-    function renderServer(){
-      const { ready, delivered } = getQueues();
-      els.readyList.innerHTML = ready.map(o=>`
-        <div class="border rounded-lg p-3 flex items-center justify-between">
-          <div><p class="font-medium">${o.table==='TA'?'TA (Mang về)':'Bàn '+o.table}</p>
-          <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p></div>
-          <button data-deliver="${o.id}" class="px-3 py-1 rounded-lg bg-indigo-600 text-white">Đã giao</button>
-        </div>`).join('') || '<p class="text-sm text-gray-500">Chưa có món sẵn sàng.</p>';
-      els.readyList.querySelectorAll('[data-deliver]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-deliver'),'delivered')));
-
-      els.deliveredList.innerHTML = delivered.map(o=>`
-        <div class="border rounded-lg p-3 flex items-center justify-between">
-          <div><p class="font-medium">${o.table==='TA'?'TA (Mang về)':'Bàn '+o.table}</p>
-          <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p></div>
-          <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">Chờ thanh toán</span>
-        </div>`).join('') || '<p class="text-sm text-gray-500">—</p>';
-    }
-
-    let cashierBound = false;
 
     function renderCashier(){
-      const notPaidDelivered = store.orders.filter(o => o.status === 'delivered');
-      const paid    = store.orders.filter(o => o.status === 'paid');
-
+      const { delivered } = getQueues();
       // nhóm theo bàn
       const map = new Map();
-      notPaidDelivered.forEach(o=>{
-        const list = map.get(o.table) || [];
-        list.push(o);
-        map.set(o.table,list);
-      });
+      delivered.forEach(o=>{ const list=map.get(o.table)||[]; list.push(o); map.set(o.table,list); });
       const tables = Array.from(map.entries()).sort((a,b)=> (a[0]+'').localeCompare(b[0]+''));
 
       els.cashierNotPaid.innerHTML = tables.map(([table,orders])=>{
-        const amount = orders.reduce((s,o)=> s+calcOrderTotal(o), 0);
+        const amount = orders.reduce((s,o)=>s+calcOrderTotal(o),0);
         const lines = orders.map(o=>`#${shortId(o.id)} (${fmtTime(o.createdAt)}): ${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}`).join('<br/>');
-        return `
-        <div class="border rounded-lg p-3 flex items-center justify-between">
+        return `<div class="border rounded-lg p-3 flex items-center justify-between">
           <div>
             <p class="font-semibold">${table==='TA'?'TA (Mang về)':'Bàn '+table} · ${orders.length} đơn</p>
             <p class="text-xs text-gray-500">${lines}</p>
           </div>
           <div class="flex items-center gap-3">
             <span class="font-bold">${money(amount)}</span>
-            ${table==='TA'
-              ? `<button data-pay-table="TA" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán TA</button>`
-              : `<button data-pay-table="${table}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán bàn</button>`}
+            <button data-pay-table="${table}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán</button>
           </div>
         </div>`;
       }).join('') || '<p class="text-sm text-gray-500">Không có đơn.</p>';
 
-      if(!cashierBound){
-        els.cashierNotPaid.addEventListener('click', (e)=>{
-          const btn = e.target.closest('[data-pay-table]');
-          if(!btn) return;
-          const table = btn.getAttribute('data-pay-table');
-          if (table==='TA') {
-            // pay all delivered takeaway orders
-            const ids = store.orders.filter(o => o.table==='TA' && o.status==='delivered').map(o=>o.id);
-            if(ids.length===0) return;
-            ids.forEach(id=>setStatus(id,'paid'));
-          } else if (!isNaN(Number(table))) {
-            openPayTable(Number(table));
-          }
-        });
-        cashierBound = true;
-      }
+      els.cashierNotPaid.querySelectorAll('[data-pay-table]').forEach(b=>b.addEventListener('click', e=>{
+        const table = e.target.getAttribute('data-pay-table');
+        // gộp thanh toán: mở modal liệt kê
+        const list = store.orders.filter(o=>String(o.table)===String(table) && o.status==='delivered');
+        if(!list.length) return;
+        els.payTitle.textContent = `Thanh toán · ${table==='TA'?'TA (Mang về)':'Bàn '+table} (${list.length} đơn)`;
+        els.payLines.innerHTML = list.map(o=>`
+          <div class="border rounded p-2">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-600">#${shortId(o.id)} · ${fmtTime(o.createdAt)}</span>
+              <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
+            </div>
+            <div class="mt-1 space-y-1">
+              ${o.items.map(it=>{
+                const tops=(it.toppings||[]).map(t=>`(+ ${t.name}×${t.qty})`).join(', ');
+                return `<div class="flex items-center justify-between">
+                  <span>${it.name} × ${it.qty} ${tops?'<span class="text-xs text-gray-500">'+tops+'</span>':''}</span>
+                  <span class="font-medium">${money(it.price*it.qty)}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`).join('');
+        const total = list.reduce((s,o)=>s+calcOrderTotal(o),0);
+        els.payTotal.textContent = money(total);
+        els.payModal.classList.remove('hidden'); els.payModal.classList.add('flex');
+        requestAnimationFrame(()=> els.payModal.querySelector('.modal-enter')?.classList.add('modal-enter-active'));
+        els.btnConfirmPay.onclick = ()=>{
+          store.orders = store.orders.map(o => (String(o.table)===String(table) && o.status==='delivered'
+            ? {...o,status:'paid',timeline:[...(o.timeline||[]),{status:'paid',ts:now()}]} : o));
+          saveStore(); closePay(); render();
+        };
+      }));
 
-      const paidCards = paid.slice().reverse().map(o=>`
-        <div class="border rounded-lg p-3">
-          <div class="flex items-center justify-between">
-            <p class="font-semibold">${o.table==='TA'?'TA (Mang về)':'Bàn '+o.table}</p>
-            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">#${shortId(o.id)}</span>
-          </div>
-          <ul class="mt-2 text-sm list-disc list-inside">
-            ${o.items.map(it=>{
-              const tops=(it.toppings||[]).map(t=>`+ ${t.name}×${t.qty}`).join(', ');
-              return `<li>${it.name} × ${it.qty}${tops? ' ('+tops+')':''} — ${money(it.price*it.qty)}</li>`;
-            }).join('')}
-          </ul>
-          <div class="pt-2 mt-2 border-t flex items-center justify-between">
-            <span class="font-semibold">Tổng</span>
-            <span class="font-bold">${money(calcOrderTotal(o))}</span>
-          </div>
-        </div>`).join('');
-      els.cashierPaid.innerHTML = paidCards || '<p class="text-sm text-gray-500">—</p>';
-
-      const totalToday = paid.reduce((s,o)=> s+calcOrderTotal(o), 0);
-      els.cashierTotalToday.textContent = `Tổng: ${money(totalToday)}`;
-    }
-
-    function renderRevenueToday(){
-      const paid = store.orders.filter(o=>o.status==='paid' && isToday((o.timeline||[]).find(t=>t.status==='paid')?.ts || o.createdAt));
-      const tbody = document.getElementById('revTodayBody');
-      if(!tbody) return;
-      tbody.innerHTML = paid.map(o=>{
-        const total = calcOrderTotal(o);
+      // bảng doanh thu hôm nay
+      const paidToday = store.orders.filter(o=>o.status==='paid' && isToday((o.timeline||[]).find(t=>t.status==='paid')?.ts || o.createdAt));
+      els.revTodayBody.innerHTML = paidToday.map(o=>{
         const detail = o.items.map(it=>{
-          const tops = (it.toppings||[]).map(t=>`+ ${t.name}×${t.qty}`).join(', ');
+          const tops=(it.toppings||[]).map(t=>`+ ${t.name}×${t.qty}`).join(', ');
           return `${it.name}×${it.qty}${tops? ' ('+tops+')':''}`;
         }).join('; ');
         return `<tr class="border-t">
@@ -906,17 +619,55 @@
           <td class="py-2">${o.table==='TA'?'TA':o.table}</td>
           <td class="py-2">#${shortId(o.id)}</td>
           <td class="py-2">${detail}</td>
-          <td class="py-2 text-right font-medium">${money(total)}</td>
+          <td class="py-2 text-right font-medium">${money(calcOrderTotal(o))}</td>
         </tr>`;
-      }).join('') || `<tr><td class="py-2 text-gray-500" colspan="5">—</td></tr>`;
+      }).join('') || `<tr><td colspan="5" class="py-2 text-gray-500">—</td></tr>`;
+
+      const totalToday = paidToday.reduce((s,o)=>s+calcOrderTotal(o),0);
+      els.cashierTotalToday.textContent = `Tổng: ${money(totalToday)}`;
     }
 
-    function exportRevenueCSV(){
+    function renderAdmin(){
+      els.tablesInput.value = store.tables;
+      els.menuTextarea.value = JSON.stringify(store.menu,null,2);
+    }
+
+    function render(){
+      renderRole();
+      if(role==='staff') renderStaff();
+      if(role==='barista') renderBarista();
+      if(role==='cashier') renderCashier();
+      if(role==='admin') renderAdmin();
+      saveStore();
+    }
+
+    /* ================== EVENTS ================== */
+    els.roleSelect.addEventListener('change', e=>{ role=e.target.value; render(); });
+    els.btnResetData.addEventListener('click', ()=>{
+      if(confirm('Xoá tất cả đơn & làm mới?')){ store.orders=[]; saveStore(); render(); }
+    });
+    els.tableSelect.addEventListener('change', e=>{ tablePicking = e.target.value==='TA'?'TA':Number(e.target.value); renderCart(); });
+    els.catFilter.addEventListener('change', renderStaff);
+    els.searchInput.addEventListener('input', renderStaff);
+    els.btnSubmitOrder.addEventListener('click', ()=>{
+      const items = Object.entries(cart).map(([id,ci])=>{
+        const mi = store.menu.find(m=>m.id===id);
+        if(!mi || ci.qty<=0) return null;
+        return { menuItemId:id, name:mi.name, price:mi.price, qty:ci.qty, note:ci.note||'', toppings:(ci.toppings||[]), served:0 };
+      }).filter(Boolean);
+      if(!items.length) return alert('Giỏ hàng trống');
+      const o = { id:newId('ord'), table:(tablePicking==='TA'?'TA':Number(tablePicking)), items, createdAt:now(), status:'queued', timeline:[{status:'queued',ts:now()}] };
+      store.orders.push(o); saveStore(); cart={}; render(); toastNewOrders();
+    });
+    els.tabByTable.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
+    els.tabByItem.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
+    [els.btnClosePay, els.btnCancelPay].forEach(b=>b.addEventListener('click', closePay));
+    els.btnExportToday.addEventListener('click', ()=>{
       const rows = [['Time','Table','OrderId','Detail','Total']];
       const paid = store.orders.filter(o=>o.status==='paid' && isToday((o.timeline||[]).find(t=>t.status==='paid')?.ts || o.createdAt));
       paid.forEach(o=>{
         const detail = o.items.map(it=>{
-          const tops = (it.toppings||[]).map(t=>`+${t.name}x${t.qty}`).join(', ');
+          const tops=(it.toppings||[]).map(t=>`+${t.name}x${t.qty}`).join(', ');
           return `${it.name}x${it.qty}${tops? ' ('+tops+')':''}`;
         }).join('; ');
         rows.push([ new Date(o.createdAt).toLocaleString('vi-VN'), (o.table==='TA'?'TA':o.table), '#'+shortId(o.id), detail, calcOrderTotal(o) ]);
@@ -926,223 +677,31 @@
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
       a.download = `doanh_thu_${new Date().toISOString().slice(0,10)}.csv`; a.click();
       URL.revokeObjectURL(a.href);
-    }
+    });
 
-    // Toast for new orders
-    function showToast(html){
-      const host = document.getElementById('toastHost');
-      const box = document.createElement('div');
-      box.className = 'bg-black/80 text-white text-sm rounded-xl px-3 py-2 shadow';
-      box.innerHTML = html + ' <button class="ml-2 text-xs opacity-70 hover:opacity-100" data-x>✕</button>';
-      host.appendChild(box);
-      const snd = document.getElementById('newOrderSound'); try{ snd.currentTime=0; snd.play().catch(()=>{});}catch{}
-      const kill = ()=>{ box.remove(); };
-      box.querySelector('[data-x]').addEventListener('click', kill);
-      setTimeout(kill, 3000);
-    }
-    let knownOrderIds = new Set();
-    function handleNewOrders(arr){
-      const nowIds = new Set(arr.map(o=>o.id));
-      arr.forEach(o=>{
-        if(!knownOrderIds.has(o.id) && o.status==='queued'){
-          showToast(`🧾 Đơn mới #${shortId(o.id)} · ${o.table==='TA'?'Mang về':'Bàn '+o.table}`);
-        }
-      });
-      knownOrderIds = nowIds;
-    }
+    els.tablesInput?.addEventListener('input', e=>{ const n=Math.max(1,Number(e.target.value)||12); store.tables=n; saveStore(); });
 
-    function render(){
-      window.store = store;
-      window.render = render;
-      renderRole();
-      if(role==='staff') renderStaff();
-      if(role==='barista') renderBarista();
-      if(role==='server') renderServer();
-      if(role==='cashier'){ renderCashier(); renderRevenueToday(); }
-      if(role==='admin'){
-        els.tablesInput.value = store.tables;
-        els.menuTextarea.value = JSON.stringify(store.menu,null,2);
-      }
-      saveLocalOnly();
-    }
-
-    // events
-    els.roleSelect.addEventListener('change', e=>setRole(e.target.value));
-    els.btnResetData.addEventListener('click', resetData);
-    els.tableSelect?.addEventListener('change', e=>{ tablePicking = e.target.value==='TA'?'TA':Number(e.target.value); renderCart(); });
-    els.catFilter?.addEventListener('change', ()=>renderStaff());
-    els.searchInput?.addEventListener('input', ()=>renderStaff());
-    els.btnSubmitOrder?.addEventListener('click', submitOrder);
-    els.tabByTable?.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
-    els.tabByItem?.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
-    [els.btnClosePay, els.btnCancelPay].forEach(b=>b?.addEventListener('click', closePay));
-    document.getElementById('btnExportToday')?.addEventListener('click', exportRevenueCSV);
-
-    // Khởi động: nạp CSV -> store.menu rồi render
+    /* ================== INIT ================== */
     (async()=>{
-      store = loadStore();
-      try{
-        const csvMenu = await fetchCSVMenu();
-        if(csvMenu.length) { store.menu = csvMenu; saveLocalOnly(); }
-      }catch(e){ console.warn('CSV menu load failed → dùng local fallback', e); }
+      // role từ URL (nếu có)
+      const qRole = new URLSearchParams(location.search).get('role');
+      if(ROLES.includes((qRole||'').toLowerCase())) role = (qRole||'').toLowerCase();
+
+      // nạp CSV
+      await loadCSV();
+      // nếu menu vẫn trống -> tạo mẫu nhỏ để test
+      if(!store.menu.length){
+        store.menu = [
+          {id:'tra_sua_truyen_thong_m', name:'Trà sữa Truyền thống (M)', price:18000, category:'Trà sữa & Trà'},
+          {id:'tra_sua_truyen_thong_l', name:'Trà sữa Truyền thống (L)', price:23000, category:'Trà sữa & Trà'},
+          {id:'tra_dao_m', name:'Trà đào (M)', price:20000, category:'Trà sữa & Trà'},
+          {id:'cp_da_m', name:'Cà phê đá (M)', price:13000, category:'Cà phê'},
+          {id:'tp_tran_chau', name:'+ Trân châu', price:5000, category:'Topping'},
+          {id:'tp_thach_sua', name:'+ Thạch sữa Phô mai', price:5000, category:'Topping'},
+        ];
+        saveStore();
+      }
       render();
-    })();
-  </script>
-
-  <!-- === FIREBASE (config + orders + presence + dashboard) === -->
-  <script type="module">
-    // Config của bạn
-    window.FIREBASE_CONFIG = {
-      apiKey: "AIzaSyC5g01aNIwU6Ysa5zsW2ahBmR_wiAHSc-0",
-      authDomain: "tiem-nuoc-tui-minh.firebaseapp.com",
-      databaseURL: "https://tiem-nuoc-tui-minh-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "tiem-nuoc-tui-minh",
-      appId: "1:599673062211:web:2ac6b038d1b17c6130a5f6"
-    };
-
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
-    import {
-      getDatabase, ref, onValue, push, set, update, onDisconnect, serverTimestamp, get
-    } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
-    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
-
-    const hasConfig = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
-
-    const firebaseApi = {
-      app:null, db:null, auth:null, user:null,
-      ordersRef:null, configRef:null, ready:false,
-      lastOrdersHash:null,
-      async init(){
-        if(!hasConfig){ console.info('[Firebase] No config → local only'); return; }
-        try{
-          this.app = initializeApp(window.FIREBASE_CONFIG);
-          this.db = getDatabase(this.app);
-          this.auth = getAuth(this.app);
-          await signInAnonymously(this.auth);
-          onAuthStateChanged(this.auth,(u)=>{ this.user=u||null; if(u) this.setPresence(u.uid); });
-
-          this.ordersRef = ref(this.db,'orders');
-          this.configRef = ref(this.db,'config');
-          this.ready = true;
-
-          // đảm bảo có config mặc định
-          try{
-            const snap = await get(this.configRef);
-            if(!snap.exists()){
-              await set(this.configRef, {
-                tables: 20, menu: [],
-                updatedAt: serverTimestamp()
-              });
-            }
-          }catch(e){ console.warn('Ensure default config error:', e); }
-        }catch(err){
-          console.error('[Firebase] init error:',err);
-          this.ready=false;
-        }
-      },
-      setPresence(uid){
-        try{
-          const pRef = ref(this.db, `presence/${uid}`);
-          onDisconnect(pRef).remove();
-          set(pRef, { online: true, ts: serverTimestamp() });
-          onValue(ref(this.db,'presence'), (snap)=>{
-            const val = snap.val() || {};
-            const online = Object.keys(val).length;
-            const el = document.getElementById('kpiOnline');
-            if(el) el.textContent = String(online);
-          });
-        }catch(e){ console.error('presence error', e); }
-      },
-      subscribeOrders(cb){
-        if(!this.ready) return;
-        onValue(this.ordersRef,(snap)=>{
-          const val = snap.val() || {};
-          const arr = Object.entries(val).map(([id,data])=>({id,...data}))
-            .sort((a,b)=>a.createdAt-b.createdAt);
-          const h = JSON.stringify(arr.map(o=>[o.id,o.status,o.timeline?.length||0,o.items?.length||0]));
-          if(h!==this.lastOrdersHash){ this.lastOrdersHash=h; cb(arr); this.updateDashboard(arr); }
-        });
-      },
-      subscribeConfig(cb){
-        if(!this.ready) return;
-        onValue(this.configRef,(snap)=>{
-          const val = snap.val();
-          if(!val) return;
-          cb({ tables: val.tables, menu: val.menu || [] });
-        });
-      },
-      updateDashboard(arr){
-        const total = arr.length;
-        const elOrders = document.getElementById('kpiOrders');
-        if(elOrders) elOrders.textContent = String(total);
-
-        const enc = new TextEncoder();
-        let bytes = 0;
-        for(const o of arr){ bytes += enc.encode(JSON.stringify(o)).length; }
-        const MB = (bytes/(1024*1024)).toFixed(2);
-        const pct = Math.min(100, (bytes/(1024*1024*1024))*100);
-        const st = document.getElementById('kpiStorage'); const bar = document.getElementById('kpiStorageBar'); const pctEl = document.getElementById('kpiStoragePct');
-        if(st) st.textContent = MB+' MB';
-        if(bar) bar.style.width = pct.toFixed(1)+'%';
-        if(pctEl) pctEl.textContent = pct.toFixed(1)+'%';
-
-        const assumedReadsPerMonth = 5;
-        const downGB = (bytes*assumedReadsPerMonth)/(1024*1024*1024);
-        const downPct = Math.min(100, (downGB/10)*100);
-        const bw = document.getElementById('kpiBandwidth'); const bwBar = document.getElementById('kpiBandwidthBar'); const bwPct = document.getElementById('kpiBandwidthPct');
-        if(bw) bw.textContent = downGB.toFixed(2)+' GB';
-        if(bwBar) bwBar.style.width = downPct.toFixed(1)+'%';
-        if(bwPct) bwPct.textContent = downPct.toFixed(1)+'%';
-      },
-      async pushOrder(order){
-        if(!this.ready) return false;
-        try{ const r = push(this.ordersRef); await set(r,{...order,id:r.key}); return true; }
-        catch(e){ console.error(e); return false; }
-      },
-      async updateStatus(orderId,status,timeline){
-        if(!this.ready) return false;
-        try{ await update(ref(this.db,`orders/${orderId}`),{status,timeline}); return true; }
-        catch(e){ console.error(e); return false; }
-      },
-      async clearAllOrders(){
-        if(!this.ready) return false;
-        try{ await set(this.ordersRef,null); this.lastOrdersHash=null; return true; }
-        catch(e){ console.error(e); return false; }
-      },
-      async updateConfig({ tables, menu }){
-        if(!this.ready) return false;
-        try{
-          await update(this.configRef, {
-            ...(typeof tables==='number' ? { tables } : {}),
-            ...(Array.isArray(menu) ? { menu } : {}),
-            updatedAt: serverTimestamp()
-          });
-          return true;
-        }catch(e){ console.error('updateConfig error', e); return false; }
-      }
-    };
-
-    window.firebaseApi = firebaseApi;
-
-    (async()=>{
-      await firebaseApi.init();
-      if(firebaseApi.ready){
-        firebaseApi.subscribeOrders((orders)=>{
-          try{
-            handleNewOrders(orders);
-            window.store.orders = orders;
-            if(typeof window.render==='function') window.render();
-          }
-          catch(e){ console.error(e); }
-        });
-        firebaseApi.subscribeConfig(({tables,menu})=>{
-          try{
-            if(typeof tables==='number') window.store.tables = tables;
-            if(Array.isArray(menu)) window.store.menu = menu;
-            if(typeof window.render==='function') window.render();
-          }catch(e){ console.error(e); }
-        });
-      }
     })();
   </script>
 </body>
