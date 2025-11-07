@@ -3,706 +3,884 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tiệm Nước Tụi Mình · POS</title>
+  <title>Tiệm Nước Tụi Mình · POS + Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- PapaParse để đọc CSV -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            tnm: {
+              primary: '#0ea5e9', // sky-500
+              amber: '#f59e0b',
+              green: '#10b981',
+              red: '#ef4444'
+            }
+          },
+          boxShadow: { soft:'0 6px 24px rgba(0,0,0,.08)' }
+        }
+      }
+    }
+  </script>
   <style>
-    .modal-enter{opacity:0;transform:translateY(6px)}
-    .modal-enter-active{opacity:1;transform:translateY(0);transition:all .15s ease}
+    .pop-enter{opacity:0;transform:translateY(8px)}
+    .pop-enter-active{opacity:1;transform:translateY(0);transition:all .2s ease}
+    .badge{font-size:.72rem}
+    .scroll-snap-x{scroll-snap-type:x mandatory}
+    .snap-start{scroll-snap-align:start}
+    .hide-scroll::-webkit-scrollbar{display:none}
   </style>
 </head>
-<body class="min-h-screen bg-gray-100">
-  <!-- Header -->
+<body class="bg-gray-50 min-h-screen">
+  <!-- ===== Header ===== -->
   <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="text-2xl">🧋</span>
-        <div>
-          <h1 class="text-lg font-bold">Tiệm Nước Tụi Mình · POS</h1>
-          <p class="text-xs text-gray-500">HTML + CSV · LocalStorage</p>
-        </div>
+    <div class="max-w-6xl mx-auto px-3 py-2 flex items-center gap-3">
+      <div class="text-2xl">🧋</div>
+      <div class="flex-1">
+        <h1 class="text-base font-semibold">Tiệm Nước Tụi Mình · POS</h1>
+        <p class="text-xs text-gray-500">CSV + Realtime (Firebase hoặc Local)</p>
       </div>
-      <div class="flex items-center gap-3">
-        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm">
-          <option value="staff">Nhân viên (Gọi món)</option>
-          <option value="barista">Quầy pha chế</option>
+      <div class="flex items-center gap-2">
+        <select id="roleSelect" class="text-sm border rounded px-2 py-1">
+          <option value="staff">Nhân viên</option>
+          <option value="barista">Pha chế</option>
           <option value="cashier">Thu ngân</option>
-          <option value="admin">Quản lý</option>
+          <option value="admin">Admin</option>
         </select>
-        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset đơn</button>
+        <button id="resetBtn" class="text-sm px-3 py-1 border rounded hover:bg-gray-100">Reset</button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+  <!-- ===== Notifications ===== -->
+  <div id="toastHost" class="fixed left-2 top-16 space-y-2 z-50"></div>
+  <audio id="ping" preload="auto" class="hidden">
+    <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQA…(base64 beep trimmed)…" type="audio/mp3">
+  </audio>
+
+  <!-- ===== Main ===== -->
+  <main class="max-w-6xl mx-auto p-3">
     <!-- STAFF -->
-    <section id="view-staff" class="hidden">
-      <div class="grid md:grid-cols-3 gap-6">
-        <div class="md:col-span-2 space-y-4">
-          <section class="bg-white rounded-2xl shadow-sm border p-5">
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-xl font-semibold text-gray-900">Chọn bàn & Menu</h2>
-              <div class="flex items-center gap-3">
-                <select id="tableSelect" class="border rounded-lg px-3 py-2 text-sm"></select>
-                <select id="catFilter" class="border rounded-lg px-3 py-2 text-sm"></select>
-                <input id="searchInput" class="border rounded-lg px-3 py-2 text-sm w-48" placeholder="Tìm món..." />
-              </div>
-            </div>
-            <div id="menuGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-          </section>
+    <section id="view-staff" class="space-y-3">
+      <div class="bg-white border rounded-xl p-3 shadow-soft">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs text-gray-500">Chọn bàn</label>
+            <select id="tableSelect" class="w-full border rounded px-2 py-2">
+              <option value="takeaway">Mang về</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Phân loại</label>
+            <select id="categorySelect" class="w-full border rounded px-2 py-2">
+              <option value="__all__">Tất cả</option>
+            </select>
+          </div>
         </div>
-        <div class="space-y-4">
-          <section class="bg-white rounded-2xl shadow-sm border p-5">
-            <h2 id="cartTitle" class="text-xl font-semibold text-gray-900 mb-3">Giỏ hàng</h2>
-            <div id="cartList" class="space-y-3 text-sm text-gray-700">Chưa có món.</div>
-            <div class="pt-3 mt-2 border-t flex items-center justify-between">
-              <span class="font-semibold">Tổng</span>
-              <span id="cartTotal" class="font-bold">0₫</span>
-            </div>
-            <button id="btnSubmitOrder" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 mt-3">
-              Gửi order đến quầy pha chế
-            </button>
-          </section>
-          <section class="bg-white rounded-2xl shadow-sm border p-5">
-            <h2 class="text-xl font-semibold text-gray-900 mb-3">Đơn gần đây (chưa thanh toán)</h2>
-            <div id="recentOrders" class="space-y-2 max-h-80 overflow-auto pr-1"></div>
-          </section>
+        <div class="mt-2 flex gap-2">
+          <button data-qf="Cà phê" class="qf-btn text-xs px-2 py-1 border rounded">Cà phê</button>
+          <button data-qf="Matcha" class="qf-btn text-xs px-2 py-1 border rounded">Matcha</button>
+          <button data-qf="Trà sữa & Trà" class="qf-btn text-xs px-2 py-1 border rounded">Trà sữa & Trà</button>
+          <button data-qf="Đồ ăn vặt" class="qf-btn text-xs px-2 py-1 border rounded">Đồ ăn vặt</button>
         </div>
+      </div>
+
+      <!-- Menu Grid -->
+      <div id="menuGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
+
+      <!-- Cart -->
+      <div class="bg-white border rounded-xl p-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Giỏ hàng</h3>
+          <button id="clearCartBtn" class="text-xs text-gray-500 hover:text-red-600">Xóa giỏ</button>
+        </div>
+        <div id="cartList" class="divide-y my-2"></div>
+        <div class="flex items-center justify-between">
+          <div class="text-sm">Tổng: <span id="cartTotal" class="font-semibold">0</span> đ</div>
+          <button id="sendOrderBtn" class="px-3 py-2 bg-tnm-primary text-white rounded-lg disabled:opacity-50">Gửi order đến quầy pha chế</button>
+        </div>
+      </div>
+
+      <!-- My Orders -->
+      <div class="bg-white border rounded-xl p-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Các đơn của tôi</h3>
+          <span class="text-xs text-gray-500">Chưa thanh toán</span>
+        </div>
+        <div id="myOrders" class="space-y-2 mt-2"></div>
       </div>
     </section>
 
     <!-- BARISTA -->
-    <section id="view-barista" class="hidden space-y-4">
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xl font-semibold text-gray-900">Hàng đợi pha chế</h2>
-          <div class="flex items-center gap-2 text-sm">
-            <button id="tabByTable" class="px-3 py-1 rounded-lg border">Xem theo bàn</button>
-            <button id="tabByItem" class="px-3 py-1 rounded-lg border">Xem tổng món</button>
-          </div>
+    <section id="view-barista" class="hidden space-y-3">
+      <div class="bg-white border rounded-xl p-3">
+        <div class="flex gap-2">
+          <button data-btab="table" class="btab px-3 py-2 bg-gray-100 rounded border">Theo bàn</button>
+          <button data-btab="item" class="btab px-3 py-2 rounded border">Theo món</button>
         </div>
-        <div id="baristaByTable" class="grid md:grid-cols-2 gap-4"></div>
-        <div id="baristaByItem" class="grid md:grid-cols-3 gap-4 hidden"></div>
-      </section>
+      </div>
+
+      <div id="barista-table" class="space-y-3"></div>
+      <div id="barista-item" class="hidden space-y-3"></div>
     </section>
 
     <!-- CASHIER -->
-    <section id="view-cashier" class="hidden space-y-4">
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-3">Chờ thanh toán</h2>
-        <div id="cashierNotPaid" class="space-y-3"></div>
-      </section>
+    <section id="view-cashier" class="hidden space-y-3">
+      <div class="grid md:grid-cols-3 gap-3">
+        <div class="bg-white border rounded-xl p-3">
+          <h3 class="font-semibold mb-2">Hàng đợi pha chế</h3>
+          <div id="cashier-queue" class="space-y-2"></div>
+        </div>
+        <div class="bg-white border rounded-xl p-3">
+          <h3 class="font-semibold mb-2">Chờ thanh toán</h3>
+          <div id="cashier-waitpay" class="space-y-2"></div>
+        </div>
+        <div class="bg-white border rounded-xl p-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold">Đã thanh toán hôm nay</h3>
+            <button id="dlRevenueBtn" class="text-xs border px-2 py-1 rounded">Tải CSV</button>
+          </div>
+          <div class="text-sm mt-1">Doanh thu hôm nay: <span id="todayAmount" class="font-semibold">0</span> đ</div>
+          <div class="overflow-auto mt-2 hide-scroll" style="max-height:320px">
+            <table class="w-full text-xs">
+              <thead class="sticky top-0 bg-gray-100">
+                <tr>
+                  <th class="text-left p-1">Thời gian</th>
+                  <th class="text-left p-1">Loại</th>
+                  <th class="text-left p-1">Mã đơn</th>
+                  <th class="text-right p-1">Số món</th>
+                  <th class="text-right p-1">Tổng</th>
+                  <th class="text-left p-1">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody id="revenueTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-xl font-semibold text-gray-900">Đã thanh toán hôm nay</h2>
-          <span id="cashierTotalToday" class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700"></span>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left text-gray-600">
-                <th class="py-2">Thời gian</th>
-                <th class="py-2">Bàn</th>
-                <th class="py-2">Mã đơn</th>
-                <th class="py-2">Chi tiết</th>
-                <th class="py-2 text-right">Tổng</th>
-              </tr>
-            </thead>
-            <tbody id="revTodayBody"></tbody>
-          </table>
-        </div>
-        <div class="mt-3 text-right">
-          <button id="btnExportToday" class="px-3 py-1 rounded-lg border">Tải CSV</button>
-        </div>
-      </section>
+      <!-- Pay modal trigger area -->
+      <div id="cashier-modals"></div>
     </section>
 
     <!-- ADMIN -->
-    <section id="view-admin" class="hidden grid md:grid-cols-2 gap-6">
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-3">Cấu hình quán</h2>
-        <label class="text-sm text-gray-700">Số lượng bàn</label>
-        <input id="tablesInput" type="number" min="1" class="border rounded-lg px-3 py-2 w-40" />
-        <p class="text-xs text-gray-500 mt-2">CSV: <code>assets/menu.csv</code> · Cột: Category, Item, Size, Price</p>
-      </section>
-      <section class="bg-white rounded-2xl shadow-sm border p-5">
-        <h2 class="text-xl font-semibold text-gray-900 mb-3">Menu (JSON xem nhanh)</h2>
-        <textarea id="menuTextarea" class="w-full h-80 border rounded-xl p-3 font-mono text-sm" readonly></textarea>
-      </section>
+    <section id="view-admin" class="hidden space-y-3">
+      <div class="grid md:grid-cols-2 gap-3">
+        <div class="bg-white border rounded-xl p-3">
+          <h3 class="font-semibold mb-2">Dashboard KPI</h3>
+          <ul class="text-sm space-y-1">
+            <li>Đơn tổng (hôm nay): <span id="kpiOrdersToday" class="font-semibold">0</span></li>
+            <li>Dung lượng local ước tính: <span id="kpiLocalSize" class="font-semibold">0 KB</span></li>
+            <li>Thiết bị online (Broadcast): <span id="kpiPeers" class="font-semibold">1</span></li>
+            <li>Băng thông ước tính: <span id="kpiBandwidth" class="font-semibold">—</span></li>
+          </ul>
+        </div>
+        <div class="bg-white border rounded-xl p-3">
+          <h3 class="font-semibold mb-2">Cấu hình</h3>
+          <div class="flex gap-2 items-end">
+            <div class="flex-1">
+              <label class="text-xs text-gray-500">Số lượng bàn</label>
+              <input id="cfgTables" type="number" min="1" value="12" class="w-full border rounded px-2 py-2" />
+            </div>
+            <button id="saveCfg" class="px-3 py-2 bg-tnm-primary text-white rounded-lg">Lưu</button>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">Không còn Menu JSON. Menu lấy từ <code>assets/menu.csv</code>.</p>
+        </div>
+      </div>
     </section>
   </main>
 
-  <!-- Pay Modal -->
-  <div id="payModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-2xl w-full max-w-lg p-5 modal-enter">
-      <div class="flex items-center justify-between mb-2">
-        <h3 id="payTitle" class="text-lg font-semibold">Thanh toán</h3>
-        <button id="btnClosePay" class="text-gray-500 hover:text-gray-700">✕</button>
-      </div>
-      <div id="payLines" class="space-y-2"></div>
-      <div class="pt-2 mt-2 border-t flex items-center justify-between">
-        <span class="font-semibold">Tổng</span>
-        <span id="payTotal" class="font-bold">0₫</span>
-      </div>
-      <div class="mt-4 flex justify-end gap-2">
-        <button id="btnCancelPay" class="px-4 py-2 rounded-lg border">Đóng</button>
-        <button id="btnConfirmPay" class="px-4 py-2 rounded-lg bg-emerald-600 text-white">Xác nhận thanh toán</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast host + sound -->
-  <div id="toastHost" class="fixed top-3 left-3 z-50 space-y-2"></div>
-  <audio id="newOrderSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+  <!-- ===== Modal (Cashier Pay) ===== -->
+  <div id="modalHost"></div>
 
   <script>
-    /* ================== CORE ================== */
-    const CSV_PATH = 'assets/menu.csv';
-    const STORAGE_KEY = 'tn_pos_v2';
-    const ROLES = ['staff','barista','cashier','admin'];
+  /********************
+   * Utilities
+   ********************/
+  const fmtVND = n => (n||0).toLocaleString('vi-VN');
+  const todayKey = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }); // YYYY-MM-DD
+  const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+  const sleep = ms => new Promise(r=>setTimeout(r, ms));
+  const qs = (k) => new URLSearchParams(location.search).get(k) || (location.hash.startsWith('#role=')?location.hash.replace('#role=',''):null);
 
-    function slugify(str){
-      return String(str||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-zA-Z0-9\\s-]/g,'').trim().replace(/\\s+/g,'_').toLowerCase();
-    }
-    function parsePrice(v){ if(typeof v==='number') return v; const s=String(v||'').replace(/[^\\d]/g,''); return s?Number(s):0; }
-    function money(n){ return n.toLocaleString('vi-VN')+'₫'; }
-    function now(){ return Date.now(); }
-    function newId(p){ return p+'_'+Math.random().toString(36).slice(2,9); }
-    function shortId(id){ return id? id.slice(-4):''; }
-    function fmtTime(ts){ return new Date(ts).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); }
-    function isToday(ts){ const d=new Date(ts), t=new Date(); return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate(); }
+  // Simple state
+  const STATE = {
+    role: 'staff',
+    cfg: { tables: 12 },
+    menuRows: [],            // [{category,item,size,price}]
+    menuIndex: {},           // itemName -> {category, sizes:[{size, price, id}]}
+    toppings: [],            // from Category='Topping'
+    cart: [],                // local cart [{menuItemId,name,size,basePrice,qty,toppings[],note,itemStatus}]
+    myOrders: [],            // current user's (queued/delivered not paid)
+    peers: 1,
+  };
 
-    // state
-    let store = loadStore();
-    let role = 'staff';
-    let baristaTab = 'by-table';
-    let tablePicking = 1;
-    let viewingOrderId = null;
+  // Storage keys
+  const LS = {
+    cfg: 'tiemnuoctuiminh_pos_v1_html',
+    menuCache: 'tnm_menu_csv_cache',
+    revenue: (yyyyMMdd) => `tnm_revenue_${yyyyMMdd.replaceAll('-','')}`,
+  };
 
-    // cart: { id: { qty, note, toppings:[{id,name,price,qty}] } }
-    let cart = {};
-    function ensureCartItem(id){ if(!cart[id]) cart[id]={qty:0,note:'',toppings:[]}; return cart[id]; }
+  // BroadcastChannel
+  const BC = new BroadcastChannel('tnm_pos');
+  BC.onmessage = (e)=>{
+    if(e?.data?.type==='peer-ping'){ STATE.peers = e.data.peers; renderAdminKPI(); }
+    if(e?.data?.type==='orders-updated'){ refreshAll(); }
+    if(e?.data?.type==='revenue-updated'){ loadRevenueUI(); }
+  };
+  setInterval(()=>BC.postMessage({type:'peer-ping', peers: STATE.peers+1}), 4000);
 
-    function loadStore(){
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return { menu: [], orders: [], tables: 12 };
-        const p = JSON.parse(raw);
-        return { menu: p.menu||[], orders: p.orders||[], tables: p.tables||12 };
-      }catch{ return { menu: [], orders: [], tables: 12 }; }
-    }
-    function saveStore(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
+  // Toasts
+  const toastHost = document.getElementById('toastHost');
+  let toastQueue = [];
+  let toastActive = false;
+  function showToast(msg){
+    toastQueue.push(msg);
+    if(!toastActive) nextToast();
+  }
+  async function nextToast(){
+    if(!toastQueue.length){ toastActive=false; return; }
+    toastActive = true;
+    const msg = toastQueue.shift();
+    const el = document.createElement('div');
+    el.className = 'pop-enter bg-white border shadow-soft rounded-lg px-3 py-2 text-sm max-w-xs';
+    el.innerHTML = `<div class="flex items-start gap-2">
+      <span>🔔</span><div class="flex-1">${msg}</div>
+      <button class="text-gray-400 hover:text-gray-700" onclick="this.parentElement.parentElement.remove()">×</button>
+    </div>`;
+    toastHost.appendChild(el);
+    requestAnimationFrame(()=>el.classList.add('pop-enter-active'));
+    setTimeout(()=>{ el.remove(); nextToast(); }, 3000);
+  }
 
-    // elements
-    const els = {
-      roleSelect: document.getElementById('roleSelect'),
-      btnResetData: document.getElementById('btnResetData'),
-      views:{
-        staff: document.getElementById('view-staff'),
-        barista: document.getElementById('view-barista'),
-        cashier: document.getElementById('view-cashier'),
-        admin: document.getElementById('view-admin'),
-      },
-      tableSelect: document.getElementById('tableSelect'),
-      catFilter: document.getElementById('catFilter'),
-      searchInput: document.getElementById('searchInput'),
-      menuGrid: document.getElementById('menuGrid'),
-      cartTitle: document.getElementById('cartTitle'),
-      cartList: document.getElementById('cartList'),
-      cartTotal: document.getElementById('cartTotal'),
-      btnSubmitOrder: document.getElementById('btnSubmitOrder'),
-      recentOrders: document.getElementById('recentOrders'),
-      // barista
-      tabByTable: document.getElementById('tabByTable'),
-      tabByItem: document.getElementById('tabByItem'),
-      baristaByTable: document.getElementById('baristaByTable'),
-      baristaByItem: document.getElementById('baristaByItem'),
-      // cashier
-      cashierNotPaid: document.getElementById('cashierNotPaid'),
-      cashierTotalToday: document.getElementById('cashierTotalToday'),
-      revTodayBody: document.getElementById('revTodayBody'),
-      btnExportToday: document.getElementById('btnExportToday'),
-      // admin
-      tablesInput: document.getElementById('tablesInput'),
-      menuTextarea: document.getElementById('menuTextarea'),
-      // pay modal
-      payModal: document.getElementById('payModal'),
-      payTitle: document.getElementById('payTitle'),
-      payLines: document.getElementById('payLines'),
-      payTotal: document.getElementById('payTotal'),
-      btnClosePay: document.getElementById('btnClosePay'),
-      btnCancelPay: document.getElementById('btnCancelPay'),
-      btnConfirmPay: document.getElementById('btnConfirmPay'),
-    };
+  // Beep
+  function ping(){ try{ document.getElementById('ping').currentTime=0; document.getElementById('ping').play(); }catch(e){} }
 
-    /* ================== MENU (CSV) ================== */
-    function rowToMenuItem(row){
-      const category = (row.Category||'Other').toString().trim();
-      const baseName = (row.Item||'').toString().trim(); if(!baseName) return null;
-      const size = (row.Size||'').toString().trim();
-      const name = size ? \`\${baseName} (\${size})\` : baseName;
-      const price = parsePrice(row.Price);
-      const id = slugify(name)||('itm_'+Math.random().toString(36).slice(2,8));
-      return { id, name, price, category };
-    }
-    async function loadCSV(){
-      try{
-        const res = await fetch(CSV_PATH, {cache:'no-store'});
-        const text = await res.text();
-        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-        const rows = Array.isArray(parsed.data) ? parsed.data : [];
-        const items = rows.map(rowToMenuItem).filter(Boolean);
-        if(items.length){ store.menu = items; saveStore(); }
-      }catch(e){ console.warn('Không đọc được CSV:', e); }
-    }
+  /********************
+   * Adapters (DB)
+   ********************/
+  const hasFirebase = !!window.FIREBASE_CONFIG;
+  let DB = null;
 
-    /* ================== HELPERS ================== */
-    function statusLabel(s){ return ({queued:'Chờ pha',brewing:'Đang pha',ready:'Sẵn sàng',delivered:'Đã giao',paid:'Đã thanh toán'})[s]||s; }
-    function calcOrderTotal(o){
-      return o.items.reduce((t,it)=> t + it.price*it.qty + (it.toppings||[]).reduce((s,tp)=>s+tp.price*tp.qty,0), 0);
-    }
-    function getQueues(){
-      const notPaid = store.orders.filter(o => o.status!=='paid').sort((a,b)=>a.createdAt-b.createdAt);
-      const brewing = notPaid.filter(o=>['queued','brewing'].includes(o.status));
-      const delivered = notPaid.filter(o=>o.status==='delivered');
-      return { brewing, delivered };
-    }
-    function getToppings(){ return (store.menu||[]).filter(m=>/topping/i.test(m.category)); }
-
-    function setStatus(orderId, status){
-      store.orders = store.orders.map(o => o.id===orderId
-        ? {...o,status, timeline:[...(o.timeline||[]), {status, ts: now()}]}
-        : o);
-      saveStore(); render();
-    }
-    function serveItem(orderId, itemIndex, amount=1){
-      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
-      const it = o.items[itemIndex]; if(!it) return;
-      it.served = Math.min(it.qty, (it.served||0)+amount);
-      const allServed = o.items.every(x => (x.served||0) >= x.qty);
-      if(allServed && o.status!=='paid'){
-        o.status='delivered';
-        o.timeline=[...(o.timeline||[]),{status:'delivered',ts:now()}];
-      }else if(o.status==='queued'){
-        o.status='brewing';
-      }
-      saveStore(); render();
-    }
-
-    function openPay(orderId){
-      const o = store.orders.find(x=>x.id===orderId); if(!o) return;
-      viewingOrderId = orderId;
-      els.payTitle.textContent = `Thanh toán · ${o.table==='TA'?'TA (Mang về)':'Bàn '+o.table}`;
-      els.payLines.innerHTML = o.items.map(it=>{
-        const tops = (it.toppings||[]).map(t=>`<div class="flex justify-between text-xs text-gray-600"><span>• ${t.name} × ${t.qty}</span><span>${money(t.price*t.qty)}</span></div>`).join('');
-        return `<div class="flex items-start justify-between">
-          <div><div>${it.name} × ${it.qty}</div>${tops}</div>
-          <span class="font-medium">${money(it.price*it.qty)}</span>
-        </div>`;
-      }).join('');
-      els.payTotal.textContent = money(calcOrderTotal(o));
-      els.payModal.classList.remove('hidden'); els.payModal.classList.add('flex');
-      requestAnimationFrame(()=> els.payModal.querySelector('.modal-enter')?.classList.add('modal-enter-active'));
-      els.btnConfirmPay.onclick = ()=>{ setStatus(orderId,'paid'); closePay(); };
-    }
-    function closePay(){
-      els.payModal.classList.add('hidden'); els.payModal.classList.remove('flex');
-      els.payModal.querySelector('.modal-enter')?.classList.remove('modal-enter-active');
-      viewingOrderId = null;
-    }
-
-    // Toast + sound cho đơn mới
-    let knownOrderIds = new Set(store.orders.map(o=>o.id));
-    function showToast(html){
-      const host = document.getElementById('toastHost');
-      const box = document.createElement('div');
-      box.className = 'bg-black/80 text-white text-sm rounded-xl px-3 py-2 shadow';
-      box.innerHTML = html + ' <button class="ml-2 text-xs opacity-70 hover:opacity-100" data-x>✕</button>';
-      host.appendChild(box);
-      const snd = document.getElementById('newOrderSound'); try{ snd.currentTime=0; snd.play().catch(()=>{});}catch{}
-      const kill = ()=>box.remove(); box.querySelector('[data-x]').addEventListener('click', kill);
-      setTimeout(kill, 3000);
-    }
-    function toastNewOrders(){
-      store.orders.forEach(o=>{
-        if(!knownOrderIds.has(o.id) && o.status==='queued'){
-          showToast(`🧾 Đơn mới #${shortId(o.id)} · ${o.table==='TA'?'Mang về':'Bàn '+o.table}`);
+  // Local adapter
+  const LocalDB = {
+    _ordersKey: 'tnm_orders_today', // store only today in demo; extend as needed
+    _loadOrders(){
+      const k = `${this._ordersKey}_${todayKey()}`;
+      return JSON.parse(localStorage.getItem(k) || '[]');
+    },
+    _saveOrders(arr){
+      const k = `${this._ordersKey}_${todayKey()}`;
+      localStorage.setItem(k, JSON.stringify(arr));
+      BC.postMessage({type:'orders-updated'});
+    },
+    async listOrders(){ return this._loadOrders(); },
+    async pushOrder(order){
+      const arr = this._loadOrders();
+      arr.push(order);
+      this._saveOrders(arr);
+      // notify barista
+      showToast(`Có đơn mới: ${order.type==='takeaway'?'Mang về':'Bàn '+order.table} • ${order.items.length} món`);
+      ping();
+      return order.id;
+    },
+    async updateItemStatus(orderId, itemIdx, status){
+      const arr = this._loadOrders();
+      const i = arr.findIndex(o=>o.id===orderId);
+      if(i<0) return;
+      arr[i].items[itemIdx].itemStatus = status;
+      // if all delivered -> order.delivered
+      if(arr[i].items.every(it=>it.itemStatus==='delivered')) arr[i].status='delivered';
+      this._saveOrders(arr);
+    },
+    async updateOrderStatus(orderId, status){
+      const arr = this._loadOrders();
+      const i = arr.findIndex(o=>o.id===orderId);
+      if(i<0) return;
+      arr[i].status = status;
+      this._saveOrders(arr);
+    },
+    async markPaid(group){ // group by table or takeaway
+      const arr = this._loadOrders();
+      let changed = false;
+      for(const o of arr){
+        if(o.status==='delivered' && ((group.type==='takeaway' && o.type==='takeaway') || (group.type==='table' && o.type==='table' && o.table===group.table))){
+          o.status='paid';
+          changed = true;
+          // record revenue
+          Revenue.record(o);
         }
-      });
-      knownOrderIds = new Set(store.orders.map(o=>o.id));
+      }
+      if(changed){ this._saveOrders(arr); BC.postMessage({type:'revenue-updated'}); }
+      return changed;
     }
+  };
 
-    /* ================== RENDER ================== */
-    function renderRole(){
-      Object.values(els.views).forEach(v=>v.classList.add('hidden'));
-      els.views[role].classList.remove('hidden');
-      els.roleSelect.value = role;
+  // Revenue local
+  const Revenue = {
+    record(order){
+      const key = LS.revenue(todayKey());
+      const pack = JSON.parse(localStorage.getItem(key) || '{"entries":{},"summary":{"totalOrders":0,"totalAmount":0}}');
+      const amount = order.items.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0)) * it.qty, 0);
+      const entry = {
+        orderId: order.id,
+        tableOrTakeAway: order.type==='takeaway' ? 'Mang về' : `Bàn ${order.table}`,
+        items: order.items.map(i=>({name:i.name,size:i.size,qty:i.qty})),
+        amount,
+        paidAt: new Date().toLocaleString('sv-SE', { timeZone:'Asia/Ho_Chi_Minh' })
+      };
+      pack.entries[order.id] = entry;
+      const uniqPaid = Object.keys(pack.entries).length;
+      const sum = Object.values(pack.entries).reduce((s,e)=>s+(e.amount||0),0);
+      pack.summary = { totalOrders: uniqPaid, totalAmount: sum };
+      localStorage.setItem(key, JSON.stringify(pack));
+    },
+    load(){
+      const key = LS.revenue(todayKey());
+      return JSON.parse(localStorage.getItem(key) || '{"entries":{},"summary":{"totalOrders":0,"totalAmount":0}}');
     }
+  };
 
-    function renderStaff(){
-      els.tableSelect.innerHTML =
-        `<option value="TA">Mang về (TA)</option>` +
-        Array.from({length: store.tables}).map((_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
-      els.tableSelect.value = String(tablePicking);
-      els.cartTitle.textContent = `Giỏ hàng · ${tablePicking==='TA'?'Mang về':('Bàn '+tablePicking)}`;
+  // Placeholder Firebase adapter (wired to Local for this demo; structure ready)
+  const FirebaseDB = {
+    // Implement with firebase-app + firebase-database scripts if needed.
+    // For this single-file demo (no external libs), we simulate by delegating to LocalDB.
+    async listOrders(){ return LocalDB.listOrders(); },
+    async pushOrder(order){ return LocalDB.pushOrder(order); },
+    async updateItemStatus(orderId, idx, status){ return LocalDB.updateItemStatus(orderId, idx, status); },
+    async updateOrderStatus(orderId, status){ return LocalDB.updateOrderStatus(orderId, status); },
+    async markPaid(group){ return LocalDB.markPaid(group); }
+  };
 
-      const prevCat = els.catFilter.value || 'All';
-      const cats = ['All', ...new Set((store.menu||[]).map(m=>m.category))];
-      els.catFilter.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
-      els.catFilter.value = cats.includes(prevCat) ? prevCat : 'All';
+  DB = hasFirebase ? FirebaseDB : LocalDB;
 
-      const kw = (els.searchInput.value||'').toLowerCase();
-      const cat = els.catFilter.value || 'All';
-      const list = (store.menu||[]).filter(m => (cat==='All'||m.category===cat) && (!kw || m.name.toLowerCase().includes(kw)));
+  /********************
+   * Load & cache CSV
+   ********************/
+  async function loadMenuFromCSV(){
+    // Cache
+    const cache = JSON.parse(localStorage.getItem(LS.menuCache) || 'null');
+    if(cache && cache.etag){ STATE.menuRows = cache.rows; indexMenu(); return; }
+    // Fetch
+    const res = await fetch('assets/menu.csv?ts='+Date.now());
+    const text = await res.text();
+    const rows = [];
+    text.split(/\r?\n/).forEach((line,idx)=>{
+      if(!line.trim()) return;
+      // naive CSV split on comma, safe enough for our columns (no quoted commas typical)
+      const parts = line.split(',').map(s=>s.trim());
+      if(idx===0){
+        // expect header Category,Item,Size,Price
+        return;
+      }
+      const [category,item,size,price] = parts;
+      if(!category || !item || !size) return;
+      const p = Number(price||0);
+      rows.push({category,item,size,price: isNaN(p)?0:p});
+    });
+    STATE.menuRows = rows;
+    localStorage.setItem(LS.menuCache, JSON.stringify({etag: Date.now(), rows}));
+    indexMenu();
+  }
 
-      els.menuGrid.innerHTML = list.map(m=>`
-        <div class="border rounded-xl p-4 hover:shadow-sm bg-white">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="font-semibold text-gray-900">${m.name}</h3>
-              <p class="text-xs text-gray-500">${m.category}</p>
-            </div>
-            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${money(m.price)}</span>
+  function indexMenu(){
+    const idx = {};
+    const tops = [];
+    for(const r of STATE.menuRows){
+      if(r.category==='Topping'){ tops.push({ id: uid(), name: r.item, price: r.price }); continue; }
+      if(!idx[r.item]) idx[r.item] = { category: r.category, sizes: [] };
+      idx[r.item].sizes.push({ size: r.size, price: r.price, id: uid() });
+    }
+    STATE.menuIndex = idx;
+    STATE.toppings = tops;
+  }
+
+  /********************
+   * Config & Init UI
+   ********************/
+  function loadConfig(){
+    const saved = JSON.parse(localStorage.getItem(LS.cfg) || '{}');
+    if(saved.tables) STATE.cfg.tables = saved.tables;
+    document.getElementById('cfgTables').value = STATE.cfg.tables;
+    // populate tables
+    const tableSel = document.getElementById('tableSelect');
+    tableSel.innerHTML = `<option value="takeaway">Mang về</option>` + 
+      Array.from({length: STATE.cfg.tables}, (_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
+  }
+
+  function saveConfig(){
+    localStorage.setItem(LS.cfg, JSON.stringify({ tables: Number(document.getElementById('cfgTables').value)||12 }));
+    loadConfig();
+    showToast('Đã lưu cấu hình.');
+  }
+
+  function applyRoleFromURL(){
+    const r = qs('role');
+    const role = r || sessionStorage.getItem('tnm_role') || 'staff';
+    setRole(role);
+  }
+
+  function setRole(role){
+    STATE.role = role;
+    sessionStorage.setItem('tnm_role', role);
+    document.getElementById('roleSelect').value = role;
+    // toggle views
+    for(const id of ['staff','barista','cashier','admin']){
+      document.getElementById('view-'+id).classList.toggle('hidden', id!==role);
+    }
+    refreshAll();
+  }
+
+  /********************
+   * Renderers
+   ********************/
+  function renderCategories(){
+    const cats = new Set(['__all__']);
+    for(const r of STATE.menuRows){ if(r.category && r.category!=='Topping') cats.add(r.category); }
+    const sel = document.getElementById('categorySelect');
+    sel.innerHTML = Array.from(cats).map(c=>`<option value="${c}">${c==='__all__'?'Tất cả':c}</option>`).join('');
+  }
+
+  function renderMenu(){
+    const grid = document.getElementById('menuGrid');
+    const cat = document.getElementById('categorySelect').value;
+    const items = Object.entries(STATE.menuIndex)
+      .filter(([name,info])=> cat==='__all__' || info.category===cat)
+      .map(([name,info])=>({name, ...info}));
+
+    grid.innerHTML = items.map(it=>{
+      const sizeOpts = it.sizes.map(s=>`<option value="${s.size}|${s.price}">${s.size} — ${fmtVND(s.price)}đ</option>`).join('');
+      const topOpts = STATE.toppings.map((t,i)=>`
+        <label class="flex items-center gap-2 text-xs">
+          <input type="checkbox" data-top="${t.name}|${t.price}" class="topping-cb">
+          <span>${t.name} <span class="text-gray-500">+${fmtVND(t.price)}</span></span>
+        </label>`).join('');
+      const cardId = 'card_'+uid();
+      return `<div class="bg-white border rounded-xl p-3 flex flex-col gap-2">
+        <div class="font-medium text-sm">${it.name}</div>
+        <div class="text-xs text-gray-500">${it.category}</div>
+        <select class="sizeSel w-full border rounded px-2 py-1">${sizeOpts}</select>
+        <textarea class="noteTxt w-full border rounded px-2 py-1 text-sm" rows="1" placeholder="Ghi chú (tuỳ chọn)"></textarea>
+        <details class="rounded border p-2">
+          <summary class="text-xs cursor-pointer">Thêm topping</summary>
+          <div class="mt-2 grid grid-cols-1 gap-1 max-h-28 overflow-auto">${topOpts}</div>
+        </details>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <button class="qtyDec border rounded px-2">-</button>
+            <span class="qtyVal">1</span>
+            <button class="qtyInc border rounded px-2">+</button>
           </div>
-          <div class="mt-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <button data-dec="${m.id}" class="px-2 py-1 border rounded">-</button>
-                <span class="w-8 text-center">${(cart[m.id]?.qty)||0}</span>
-                <button data-inc="${m.id}" class="px-2 py-1 border rounded">+</button>
-              </div>
-              <button data-add="${m.id}" class="px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
-            </div>
+          <button class="addBtn px-3 py-2 bg-tnm-primary text-white rounded-lg">Thêm</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Bind per-card actions
+    Array.from(grid.children).forEach(card=>{
+      const qtyVal = card.querySelector('.qtyVal');
+      card.querySelector('.qtyDec').onclick = ()=>{ const n=Math.max(1, (Number(qtyVal.textContent)||1)-1); qtyVal.textContent=n; };
+      card.querySelector('.qtyInc').onclick = ()=>{ const n=(Number(qtyVal.textContent)||1)+1; qtyVal.textContent=n; };
+      card.querySelector('.addBtn').onclick = ()=>{
+        const name = card.querySelector('.font-medium').textContent.trim();
+        const [size, price] = (card.querySelector('.sizeSel').value||'').split('|');
+        const basePrice = Number(price||0);
+        const qty = Number(qtyVal.textContent)||1;
+        const note = card.querySelector('.noteTxt').value.trim();
+        const tops = Array.from(card.querySelectorAll('.topping-cb:checked')).map(cb=>{
+          const [tn,tp] = cb.dataset.top.split('|'); return { id: uid(), name: tn, price: Number(tp||0) };
+        });
+        const menuItemId = uid();
+        STATE.cart.push({ menuItemId, name, size, basePrice, qty, toppings: tops, note, itemStatus:'queued' });
+        renderCart();
+      };
+    });
+  }
+
+  function renderCart(){
+    const list = document.getElementById('cartList');
+    if(!STATE.cart.length){ list.innerHTML = `<div class="text-sm text-gray-500">Chưa có món.</div>`; document.getElementById('cartTotal').textContent='0'; return; }
+    list.innerHTML = STATE.cart.map((it,idx)=>{
+      const tops = (it.toppings||[]).map(t=>`${t.name}(+${fmtVND(t.price)})`).join(', ');
+      const sum = (it.basePrice + (it.toppings||[]).reduce((s,x)=>s+x.price,0))*it.qty;
+      return `<div class="py-2 flex items-start gap-2">
+        <div class="flex-1">
+          <div class="text-sm font-medium">${it.name} — ${it.size} × ${it.qty}</div>
+          <div class="text-xs text-gray-500">${tops || 'Không topping'}${it.note? ' · '+it.note : ''}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-sm font-semibold">${fmtVND(sum)}</div>
+          <button data-rm="${idx}" class="text-xs text-red-600">Xóa</button>
+        </div>
+      </div>`;
+    }).join('');
+    // bind remove
+    list.querySelectorAll('[data-rm]').forEach(b=> b.onclick = ()=>{ STATE.cart.splice(Number(b.dataset.rm),1); renderCart(); });
+    // total
+    const total = STATE.cart.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty, 0);
+    document.getElementById('cartTotal').textContent = fmtVND(total);
+  }
+
+  async function sendOrder(){
+    if(!STATE.cart.length) return;
+    const sel = document.getElementById('tableSelect').value;
+    const order = {
+      id: 'ORD_'+uid(),
+      type: sel==='takeaway' ? 'takeaway' : 'table',
+      table: sel==='takeaway' ? null : Number(sel),
+      items: JSON.parse(JSON.stringify(STATE.cart)),
+      status: 'queued',
+      createdAt: Date.now(),
+      timeline: [{t:'queued', at: Date.now()}]
+    };
+    await DB.pushOrder(order);
+    STATE.cart = [];
+    renderCart();
+    // switch to My Orders
+    document.getElementById('myOrders').scrollIntoView({behavior:'smooth', block:'start'});
+    refreshMyOrders();
+  }
+
+  function orderBadge(order){
+    const take = order.type==='takeaway';
+    const cls = take ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-blue-100 text-blue-700 border-blue-300';
+    return `<span class="badge border ${cls} px-2 py-0.5 rounded">${take?'Mang về':'Bàn '+order.table}</span>`;
+  }
+
+  function renderMyOrders(orders){
+    const host = document.getElementById('myOrders');
+    const mine = orders.filter(o=> o.status!=='paid'); // simple view
+    if(!mine.length){ host.innerHTML = `<div class="text-sm text-gray-500">Chưa có đơn.</div>`; return; }
+    host.innerHTML = mine.map(o=>{
+      const delivered = o.items.filter(i=>i.itemStatus==='delivered').length;
+      return `<div class="border rounded-lg p-2">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-medium">#${o.id.slice(-6)}</div>
+          <div class="flex items-center gap-2">
+            ${orderBadge(o)}
+            <span class="text-xs ${o.status==='delivered'?'text-green-700':'text-gray-600'}">${delivered}/${o.items.length} món đã giao</span>
           </div>
         </div>
-      `).join('');
+      </div>`;
+    }).join('');
+  }
 
-      els.menuGrid.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-inc');ensureCartItem(id).qty++; renderCart();}));
-      els.menuGrid.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-dec');const it=cart[id]; if(!it) return; it.qty=Math.max(0,it.qty-1); if(it.qty===0) delete cart[id]; renderCart();}));
-      els.menuGrid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-add');const it=ensureCartItem(id); if(it.qty===0) it.qty=1; renderCart();}));
-
-      renderCart();
-
-      const listRecent = store.orders.filter(o=>o.status!=='paid').sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
-      els.recentOrders.innerHTML = listRecent.map(o=>`
-        <div class="flex items-center justify-between border rounded-lg p-3">
-          <div>
-            <p class="font-medium">${o.table==='TA'?'TA (Mang về)':'Bàn '+o.table}</p>
-            <p class="text-xs text-gray-500">${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}</p>
-          </div>
-          <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
-        </div>`).join('');
+  function groupByTable(orders){
+    const map = new Map();
+    for(const o of orders){
+      const key = o.type==='takeaway' ? 'takeaway' : `table-${o.table}`;
+      if(!map.has(key)) map.set(key, []);
+      map.get(key).push(o);
     }
-
-    function renderCart(){
-      const ids = Object.keys(cart);
-      if(ids.length===0){ els.cartList.textContent='Chưa có món.'; els.cartTotal.textContent='0₫'; return; }
-
-      const toppingOpts = getToppings().map(t=>`<option value="${t.id}">${t.name} (+${money(t.price)})</option>`).join('');
-      els.cartList.innerHTML = ids.map(id=>{
-        const mi = store.menu.find(m=>m.id===id); if(!mi) return '';
-        const ci = cart[id];
-        const tops = (ci.toppings||[]).map(tp=>`
-          <div class="flex items-center justify-between text-xs text-gray-600">
-            <span>• ${tp.name} × ${tp.qty}</span><span>${money(tp.price*tp.qty)}</span>
-          </div>`).join('');
-        return `
-        <div class="border rounded-lg p-3 space-y-2">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-medium">${mi.name}</p>
-              <p class="text-xs text-gray-500">${money(mi.price)} × ${ci.qty}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button data-dec-cart="${id}" class="px-2 py-1 border rounded">-</button>
-              <span class="w-6 text-center">${ci.qty}</span>
-              <button data-inc-cart="${id}" class="px-2 py-1 border rounded">+</button>
-            </div>
-          </div>
-          <input data-note="${id}" class="border rounded px-2 py-1 text-xs w-full" placeholder="Ghi chú cho món này..." value="${ci.note||''}">
-          <div class="flex items-center gap-2">
-            <select data-addtp="${id}" class="border rounded px-2 py-1 text-xs">
-              <option value="">+ Thêm topping</option>
-              ${toppingOpts}
-            </select>
-            <button data-cleartp="${id}" class="text-xs border px-2 py-1 rounded">Xoá topping</button>
-          </div>
-          ${tops?`<div class="pt-1 border-t">${tops}</div>`:''}
-        </div>`;
-      }).join('');
-
-      els.cartList.querySelectorAll('[data-dec-cart]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-dec-cart'); const it=cart[id]; if(!it) return; it.qty=Math.max(0,it.qty-1); if(it.qty===0) delete cart[id]; renderCart();}));
-      els.cartList.querySelectorAll('[data-inc-cart]').forEach(b=>b.addEventListener('click',e=>{const id=e.target.getAttribute('data-inc-cart'); ensureCartItem(id).qty++; renderCart();}));
-      els.cartList.querySelectorAll('[data-note]').forEach(inp=>inp.addEventListener('input', e=>{ const id=e.target.getAttribute('data-note'); ensureCartItem(id).note=e.target.value; }));
-      els.cartList.querySelectorAll('[data-addtp]').forEach(sel=>sel.addEventListener('change', e=>{
-        const id=e.target.getAttribute('data-addtp'); const tpId=e.target.value; if(!tpId) return;
-        const tp = getToppings().find(t=>t.id===tpId); if(!tp) return;
-        const ci = ensureCartItem(id);
-        const ex = ci.toppings.find(x=>x.id===tpId);
-        if(ex) ex.qty++; else ci.toppings.push({id:tp.id,name:tp.name,price:tp.price,qty:1});
-        e.target.value=''; renderCart();
-      }));
-      els.cartList.querySelectorAll('[data-cleartp]').forEach(b=>b.addEventListener('click', e=>{ const id=e.target.getAttribute('data-cleartp'); const ci=cart[id]; if(ci){ ci.toppings=[]; renderCart(); } }));
-
-      // tổng tiền
-      const total = ids.reduce((sum,id)=>{
-        const mi=store.menu.find(m=>m.id===id); const ci=cart[id];
-        const core = mi ? mi.price*ci.qty : 0;
-        const tops = (ci.toppings||[]).reduce((s,t)=>s+t.price*t.qty,0);
-        return sum + core + tops;
-      },0);
-      els.cartTotal.textContent = money(total);
-      els.cartTitle.textContent = `Giỏ hàng · ${tablePicking==='TA'?'Mang về':('Bàn '+tablePicking)}`;
+    // sort by createdAt asc and mark supplement
+    for(const arr of map.values()){
+      arr.sort((a,b)=>a.createdAt-b.createdAt);
+      arr.forEach((o,i)=>o._supplement = i>0);
     }
+    return map;
+  }
 
-    function renderBarista(){
-      els.tabByTable.classList.toggle('bg-black', baristaTab==='by-table');
-      els.tabByTable.classList.toggle('text-white', baristaTab==='by-table');
-      els.tabByItem.classList.toggle('bg-black', baristaTab==='by-item');
-      els.tabByItem.classList.toggle('text-white', baristaTab==='by-item');
+  function renderBaristaTable(orders){
+    const host = document.getElementById('barista-table');
+    host.innerHTML = '';
+    const grouped = groupByTable(orders.filter(o=>o.status!=='paid'));
+    if(!grouped.size){ host.innerHTML = `<div class="text-sm text-gray-500">Không có đơn.</div>`; return; }
+    for(const [key,arr] of grouped){
+      const title = key==='takeaway' ? 'Mang về' : `Bàn ${key.split('-')[1]}`;
+      const badge = key==='takeaway' ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Ưu tiên</span>` : '';
+      const col = document.createElement('div');
+      col.className = 'bg-white border rounded-xl p-3';
+      col.innerHTML = `<div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">${title}</h3>${badge}
+        </div>
+        <div class="space-y-2"></div>`;
+      const list = col.querySelector('.space-y-2');
 
-      const { brewing } = getQueues();
-
-      // nhóm theo bàn
-      const map = new Map();
-      brewing.forEach(o=>{
-        const list = map.get(o.table) || [];
-        list.push(o); map.set(o.table, list);
-      });
-
-      // BY TABLE
-      const entries = Array.from(map.entries()).sort((a,b)=> (a[0]+'' ).localeCompare(b[0]+''));
-      els.baristaByTable.innerHTML = entries.map(([table,orders])=>`
-        <div class="border rounded-xl p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-semibold">${table==='TA'?'TA (Mang về)':'Bàn '+table}</h3>
-            <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${orders.length} đơn</span>
-          </div>
-          <div class="space-y-3">
-            ${orders.map(o=>`
-              <div class="border rounded-lg p-3 ${o.table==='TA'?'ring-2 ring-yellow-300':''}">
-                <div class="flex items-center justify-between">
-                  <div class="text-sm text-gray-500">#${shortId(o.id)} · ${o.__addonIndex>0?'Bổ sung':'Đơn đầu'} · ${fmtTime(o.createdAt)}</div>
-                  <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
-                </div>
-                <ul class="mt-2 text-sm space-y-1">
-                  ${o.items.map((it,idx)=>`
-                    <li class="flex items-center justify-between gap-2">
-                      <div>
-                        ${it.name} × ${it.qty}
-                        ${it.note ? `<span class="ml-1 text-xs text-amber-700 bg-amber-100 px-1 rounded">Note: ${it.note}</span>`:''}
-                        ${Array.isArray(it.toppings)&&it.toppings.length? `<span class="ml-1 text-xs text-indigo-700 bg-indigo-100 px-1 rounded">+ ${it.toppings.map(t=>`${t.name}×${t.qty}`).join(', ')}</span>`:''}
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <button data-serve-one="${o.id}|${idx}" class="px-2 py-0.5 text-xs border rounded">Đã giao 1</button>
-                        <button data-serve-all="${o.id}|${idx}" class="px-2 py-0.5 text-xs border rounded">Giao hết món</button>
-                        <span class="text-xs text-gray-500">Đã giao: ${it.served||0}</span>
-                      </div>
-                    </li>`).join('')}
-                </ul>
-                <div class="mt-3 flex gap-2">
-                  ${o.status==='queued' ? `<button data-start="${o.id}" class="px-3 py-1 rounded-lg bg-amber-600 text-white">Bắt đầu pha</button>`:''}
-                  ${o.status!=='paid' ? `<button data-serve-order="${o.id}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Giao hết đơn</button>`:''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>`).join('');
-
-      // listeners
-      els.baristaByTable.querySelectorAll('[data-start]').forEach(b=>b.addEventListener('click',e=>setStatus(e.target.getAttribute('data-start'),'brewing')));
-      els.baristaByTable.querySelectorAll('[data-serve-one]').forEach(b=>b.addEventListener('click', e=>{
-        const [oid, idx] = e.target.getAttribute('data-serve-one').split('|'); serveItem(oid, Number(idx), 1);
-      }));
-      els.baristaByTable.querySelectorAll('[data-serve-all]').forEach(b=>b.addEventListener('click', e=>{
-        const [oid, idx] = e.target.getAttribute('data-serve-all').split('|');
-        const o = store.orders.find(x=>x.id===oid); if(!o) return;
-        const it=o.items[idx]; if(!it) return;
-        serveItem(oid, Number(idx), (it.qty - (it.served||0)));
-      }));
-      els.baristaByTable.querySelectorAll('[data-serve-order]').forEach(b=>b.addEventListener('click', e=>{
-        const oid = e.target.getAttribute('data-serve-order');
-        const o = store.orders.find(x=>x.id===oid); if(!o) return;
-        o.items.forEach((it,idx)=> serveItem(oid, idx, (it.qty - (it.served||0))));
-      }));
-
-      // BY ITEM (tổng hợp)
-      const agg = new Map();
-      brewing.forEach(o=>{
-        o.items.forEach(it=>{
-          const cur = agg.get(it.menuItemId) || {name:it.name,totalQty:0,rows:[]};
-          cur.totalQty += (it.qty-(it.served||0));
-          cur.rows.push({table:o.table,id:o.id,ts:o.createdAt,qty:(it.qty-(it.served||0)),addonIndex:o.__addonIndex||0});
-          agg.set(it.menuItemId, cur);
-        });
-      });
-      const rows = Array.from(agg.entries()).map(([id,v])=>({id,...v})).sort((a,b)=>b.totalQty-a.totalQty);
-      els.baristaByItem.innerHTML = rows.map(r=>`
-        <div class="border rounded-xl p-4">
-          <div class="flex items-center justify-between"><h4 class="font-semibold">${r.name}</h4><span class="text-sm font-bold">${r.totalQty}</span></div>
-          <div class="mt-2 text-xs text-gray-600 space-y-1">
-            ${r.rows.map(x=>`<div>${x.table==='TA'?'TA':'Bàn '+x.table} · #${shortId(x.id)} ${x.addonIndex>0?'· Bổ sung':''} · ${fmtTime(x.ts)} · ×${x.qty}</div>`).join('')}
-          </div>
-        </div>`).join('');
-
-      els.baristaByTable.classList.toggle('hidden', baristaTab!=='by-table');
-      els.baristaByItem.classList.toggle('hidden', baristaTab!=='by-item');
-    }
-
-    function renderCashier(){
-      const { delivered } = getQueues();
-      // nhóm theo bàn
-      const map = new Map();
-      delivered.forEach(o=>{ const list=map.get(o.table)||[]; list.push(o); map.set(o.table,list); });
-      const tables = Array.from(map.entries()).sort((a,b)=> (a[0]+'').localeCompare(b[0]+''));
-
-      els.cashierNotPaid.innerHTML = tables.map(([table,orders])=>{
-        const amount = orders.reduce((s,o)=>s+calcOrderTotal(o),0);
-        const lines = orders.map(o=>`#${shortId(o.id)} (${fmtTime(o.createdAt)}): ${o.items.map(it=>`${it.name}×${it.qty}`).join(', ')}`).join('<br/>');
-        return `<div class="border rounded-lg p-3 flex items-center justify-between">
-          <div>
-            <p class="font-semibold">${table==='TA'?'TA (Mang về)':'Bàn '+table} · ${orders.length} đơn</p>
-            <p class="text-xs text-gray-500">${lines}</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <span class="font-bold">${money(amount)}</span>
-            <button data-pay-table="${table}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán</button>
-          </div>
-        </div>`;
-      }).join('') || '<p class="text-sm text-gray-500">Không có đơn.</p>';
-
-      els.cashierNotPaid.querySelectorAll('[data-pay-table]').forEach(b=>b.addEventListener('click', e=>{
-        const table = e.target.getAttribute('data-pay-table');
-        // gộp thanh toán: mở modal liệt kê
-        const list = store.orders.filter(o=>String(o.table)===String(table) && o.status==='delivered');
-        if(!list.length) return;
-        els.payTitle.textContent = `Thanh toán · ${table==='TA'?'TA (Mang về)':'Bàn '+table} (${list.length} đơn)`;
-        els.payLines.innerHTML = list.map(o=>`
-          <div class="border rounded p-2">
+      arr.forEach(o=>{
+        const itemsHtml = o.items.map((it,idx)=>{
+          const tops = (it.toppings||[]).map(t=>t.name).join(', ');
+          return `<div class="border rounded p-2">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">#${shortId(o.id)} · ${fmtTime(o.createdAt)}</span>
-              <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${statusLabel(o.status)}</span>
+              <div class="font-medium text-sm">${it.name} — ${it.size} × ${it.qty}</div>
+              <span class="text-xs ${it.itemStatus==='delivered'?'text-green-700':'text-gray-500'}">${it.itemStatus}</span>
             </div>
-            <div class="mt-1 space-y-1">
-              ${o.items.map(it=>{
-                const tops=(it.toppings||[]).map(t=>`(+ ${t.name}×${t.qty})`).join(', ');
-                return `<div class="flex items-center justify-between">
-                  <span>${it.name} × ${it.qty} ${tops?'<span class="text-xs text-gray-500">'+tops+'</span>':''}</span>
-                  <span class="font-medium">${money(it.price*it.qty)}</span>
-                </div>`;
-              }).join('')}
+            <div class="text-xs text-gray-500">${tops||'Không topping'}${it.note?' · '+it.note:''}</div>
+            <div class="mt-1 text-right">
+              <button data-deliver="${o.id}|${idx}" class="text-xs px-2 py-1 border rounded ${it.itemStatus==='delivered'?'opacity-40 pointer-events-none':''}">Đã giao</button>
             </div>
-          </div>`).join('');
-        const total = list.reduce((s,o)=>s+calcOrderTotal(o),0);
-        els.payTotal.textContent = money(total);
-        els.payModal.classList.remove('hidden'); els.payModal.classList.add('flex');
-        requestAnimationFrame(()=> els.payModal.querySelector('.modal-enter')?.classList.add('modal-enter-active'));
-        els.btnConfirmPay.onclick = ()=>{
-          store.orders = store.orders.map(o => (String(o.table)===String(table) && o.status==='delivered'
-            ? {...o,status:'paid',timeline:[...(o.timeline||[]),{status:'paid',ts:now()}]} : o));
-          saveStore(); closePay(); render();
-        };
-      }));
+          </div>`;
+        }).join('');
 
-      // bảng doanh thu hôm nay
-      const paidToday = store.orders.filter(o=>o.status==='paid' && isToday((o.timeline||[]).find(t=>t.status==='paid')?.ts || o.createdAt));
-      els.revTodayBody.innerHTML = paidToday.map(o=>{
-        const detail = o.items.map(it=>{
-          const tops=(it.toppings||[]).map(t=>`+ ${t.name}×${t.qty}`).join(', ');
-          return `${it.name}×${it.qty}${tops? ' ('+tops+')':''}`;
-        }).join('; ');
-        return `<tr class="border-t">
-          <td class="py-2">${fmtTime(o.createdAt)}</td>
-          <td class="py-2">${o.table==='TA'?'TA':o.table}</td>
-          <td class="py-2">#${shortId(o.id)}</td>
-          <td class="py-2">${detail}</td>
-          <td class="py-2 text-right font-medium">${money(calcOrderTotal(o))}</td>
-        </tr>`;
-      }).join('') || `<tr><td colspan="5" class="py-2 text-gray-500">—</td></tr>`;
-
-      const totalToday = paidToday.reduce((s,o)=>s+calcOrderTotal(o),0);
-      els.cashierTotalToday.textContent = `Tổng: ${money(totalToday)}`;
-    }
-
-    function renderAdmin(){
-      els.tablesInput.value = store.tables;
-      els.menuTextarea.value = JSON.stringify(store.menu,null,2);
-    }
-
-    function render(){
-      renderRole();
-      if(role==='staff') renderStaff();
-      if(role==='barista') renderBarista();
-      if(role==='cashier') renderCashier();
-      if(role==='admin') renderAdmin();
-      saveStore();
-    }
-
-    /* ================== EVENTS ================== */
-    els.roleSelect.addEventListener('change', e=>{ role=e.target.value; render(); });
-    els.btnResetData.addEventListener('click', ()=>{
-      if(confirm('Xoá tất cả đơn & làm mới?')){ store.orders=[]; saveStore(); render(); }
-    });
-    els.tableSelect.addEventListener('change', e=>{ tablePicking = e.target.value==='TA'?'TA':Number(e.target.value); renderCart(); });
-    els.catFilter.addEventListener('change', renderStaff);
-    els.searchInput.addEventListener('input', renderStaff);
-    els.btnSubmitOrder.addEventListener('click', ()=>{
-      const items = Object.entries(cart).map(([id,ci])=>{
-        const mi = store.menu.find(m=>m.id===id);
-        if(!mi || ci.qty<=0) return null;
-        return { menuItemId:id, name:mi.name, price:mi.price, qty:ci.qty, note:ci.note||'', toppings:(ci.toppings||[]), served:0 };
-      }).filter(Boolean);
-      if(!items.length) return alert('Giỏ hàng trống');
-      const o = { id:newId('ord'), table:(tablePicking==='TA'?'TA':Number(tablePicking)), items, createdAt:now(), status:'queued', timeline:[{status:'queued',ts:now()}] };
-      store.orders.push(o); saveStore(); cart={}; render(); toastNewOrders();
-    });
-    els.tabByTable.addEventListener('click', ()=>{ baristaTab='by-table'; renderBarista(); });
-    els.tabByItem.addEventListener('click', ()=>{ baristaTab='by-item'; renderBarista(); });
-    [els.btnClosePay, els.btnCancelPay].forEach(b=>b.addEventListener('click', closePay));
-    els.btnExportToday.addEventListener('click', ()=>{
-      const rows = [['Time','Table','OrderId','Detail','Total']];
-      const paid = store.orders.filter(o=>o.status==='paid' && isToday((o.timeline||[]).find(t=>t.status==='paid')?.ts || o.createdAt));
-      paid.forEach(o=>{
-        const detail = o.items.map(it=>{
-          const tops=(it.toppings||[]).map(t=>`+${t.name}x${t.qty}`).join(', ');
-          return `${it.name}x${it.qty}${tops? ' ('+tops+')':''}`;
-        }).join('; ');
-        rows.push([ new Date(o.createdAt).toLocaleString('vi-VN'), (o.table==='TA'?'TA':o.table), '#'+shortId(o.id), detail, calcOrderTotal(o) ]);
+        list.innerHTML += `<div class="bg-gray-50 rounded p-2">
+          <div class="flex items-center justify-between">
+            <div class="text-sm">Đơn <span class="font-semibold">#${o.id.slice(-6)}</span>${o._supplement? ' · <span class="text-amber-600">Bổ sung</span>':''}</div>
+            <button data-deliver-all="${o.id}" class="text-xs px-2 py-1 border rounded">Giao hết</button>
+          </div>
+          <div class="mt-2 space-y-2">${itemsHtml}</div>
+        </div>`;
       });
-      const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-      a.download = `doanh_thu_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-      URL.revokeObjectURL(a.href);
+
+      host.appendChild(col);
+    }
+    // bind deliver
+    host.querySelectorAll('[data-deliver]').forEach(b=> b.onclick = async ()=>{
+      const [oid, idx] = b.dataset.deliver.split('|');
+      await DB.updateItemStatus(oid, Number(idx), 'delivered');
+      refreshAll();
     });
+    host.querySelectorAll('[data-deliver-all]').forEach(b=> b.onclick = async ()=>{
+      const oid = b.dataset.deliverAll;
+      // load current
+      const orders = await DB.listOrders();
+      const o = orders.find(x=>x.id===oid);
+      if(!o) return;
+      for(let i=0;i<o.items.length;i++){ if(o.items[i].itemStatus!=='delivered') await DB.updateItemStatus(oid, i, 'delivered'); }
+      refreshAll();
+    });
+  }
 
-    els.tablesInput?.addEventListener('input', e=>{ const n=Math.max(1,Number(e.target.value)||12); store.tables=n; saveStore(); });
-
-    /* ================== INIT ================== */
-    (async()=>{
-      // role từ URL (nếu có)
-      const qRole = new URLSearchParams(location.search).get('role');
-      if(ROLES.includes((qRole||'').toLowerCase())) role = (qRole||'').toLowerCase();
-
-      // nạp CSV
-      await loadCSV();
-      // nếu menu vẫn trống -> tạo mẫu nhỏ để test
-      if(!store.menu.length){
-        store.menu = [
-          {id:'tra_sua_truyen_thong_m', name:'Trà sữa Truyền thống (M)', price:18000, category:'Trà sữa & Trà'},
-          {id:'tra_sua_truyen_thong_l', name:'Trà sữa Truyền thống (L)', price:23000, category:'Trà sữa & Trà'},
-          {id:'tra_dao_m', name:'Trà đào (M)', price:20000, category:'Trà sữa & Trà'},
-          {id:'cp_da_m', name:'Cà phê đá (M)', price:13000, category:'Cà phê'},
-          {id:'tp_tran_chau', name:'+ Trân châu', price:5000, category:'Topping'},
-          {id:'tp_thach_sua', name:'+ Thạch sữa Phô mai', price:5000, category:'Topping'},
-        ];
-        saveStore();
+  function renderBaristaItem(orders){
+    const host = document.getElementById('barista-item');
+    const waiting = [];
+    for(const o of orders.filter(o=>o.status!=='paid')){
+      for(let i=0;i<o.items.length;i++){
+        const it = o.items[i];
+        waiting.push({ order:o, item:it, idx:i, createdAt:o.createdAt });
       }
-      render();
-    })();
+    }
+    waiting.sort((a,b)=>a.createdAt-b.createdAt);
+    if(!waiting.length){ host.innerHTML = `<div class="text-sm text-gray-500">Không có món.</div>`; return; }
+    host.innerHTML = waiting.map(rec=>{
+      const tops = (rec.item.toppings||[]).map(t=>t.name).join(', ');
+      return `<div class="bg-white border rounded-xl p-2">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-medium">${rec.item.name} — ${rec.item.size} × ${rec.item.qty}</div>
+          ${orderBadge(rec.order)}
+        </div>
+        <div class="text-xs text-gray-500">${tops||'Không topping'}${rec.item.note?' · '+rec.item.note:''}</div>
+        <div class="mt-1 text-right">
+          <button data-deliver="${rec.order.id}|${rec.idx}" class="text-xs px-2 py-1 border rounded ${rec.item.itemStatus==='delivered'?'opacity-40 pointer-events-none':''}">Đã giao</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    host.querySelectorAll('[data-deliver]').forEach(b=> b.onclick = async ()=>{
+      const [oid, idx] = b.dataset.deliver.split('|');
+      await DB.updateItemStatus(oid, Number(idx), 'delivered');
+      refreshAll();
+    });
+  }
+
+  function renderCashier(orders){
+    const queueHost = document.getElementById('cashier-queue');
+    const waitPayHost = document.getElementById('cashier-waitpay');
+    // queue = queued OR partially delivered
+    const queue = orders.filter(o=>o.status==='queued');
+    const delivered = orders.filter(o=>o.status==='delivered');
+
+    const orderCard = (o)=> {
+      const deliveredCnt = o.items.filter(i=>i.itemStatus==='delivered').length;
+      const sum = o.items.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty, 0);
+      return `<div class="border rounded p-2 bg-white">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold">#${o.id.slice(-6)}</div>
+          <div class="flex items-center gap-2">${orderBadge(o)}<span class="text-xs text-gray-500">${deliveredCnt}/${o.items.length}</span></div>
+        </div>
+        <div class="text-right text-sm font-medium mt-1">${fmtVND(sum)} đ</div>
+      </div>`;
+    };
+
+    queueHost.innerHTML = queue.map(orderCard).join('') || `<div class="text-sm text-gray-500">Trống</div>`;
+    waitPayHost.innerHTML = '';
+
+    // Group delivered by table/takeaway for payment modal
+    const groups = groupByTable(delivered);
+    for(const [key,arr] of groups){
+      const type = key==='takeaway'?'takeaway':'table';
+      const title = key==='takeaway'?'Mang về':`Bàn ${key.split('-')[1]}`;
+      const btnId = uid();
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded p-2 bg-white';
+      wrap.innerHTML = `<div class="flex items-center justify-between">
+        <div class="font-semibold">${title}</div>
+        <button id="${btnId}" class="text-xs px-2 py-1 border rounded">Thanh toán ${title}</button>
+      </div>
+      <div class="mt-2 grid sm:grid-cols-2 gap-2">${arr.map(orderCard).join('')}</div>`;
+      document.getElementById('cashier-waitpay').appendChild(wrap);
+
+      // bind pay button -> open modal
+      setTimeout(()=> document.getElementById(btnId).onclick = ()=> openPayModal({type, table: type==='table'? Number(key.split('-')[1]) : null}, arr), 0);
+    }
+  }
+
+  function openPayModal(group, orders){
+    const host = document.getElementById('modalHost');
+    const sum = (o)=> o.items.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty, 0);
+    const total = orders.reduce((s,o)=> s+sum(o), 0);
+    host.innerHTML = `<div class="fixed inset-0 bg-black/30 flex items-end sm:items-center sm:justify-center z-50" onclick="closeModal(event)">
+      <div class="bg-white rounded-t-xl sm:rounded-xl w-full sm:max-w-lg p-3" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Thanh toán ${group.type==='takeaway'?'Mang về':'Bàn '+group.table}</h3>
+          <button onclick="closeModal()" class="text-gray-500">×</button>
+        </div>
+        <div class="mt-2 max-h-80 overflow-auto">
+          ${orders.map(o=>`
+            <div class="border rounded p-2 mb-2">
+              <div class="text-sm font-medium">#${o.id.slice(-6)}</div>
+              <ul class="text-xs text-gray-700 mt-1 space-y-1">
+                ${o.items.map(it=>{
+                  const tops = (it.toppings||[]).map(t=>t.name).join(', ');
+                  const sub = (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty;
+                  return `<li>• ${it.name} — ${it.size} × ${it.qty} (${tops||'không topping'}) — <span class="font-medium">${fmtVND(sub)}</span></li>`;
+                }).join('')}
+              </ul>
+            </div>`).join('')}
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <div class="text-sm">Tổng: <span class="font-semibold">${fmtVND(total)} đ</span></div>
+          <button id="confirmPayBtn" class="px-3 py-2 bg-tnm-green text-white rounded">Xác nhận thanh toán</button>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('confirmPayBtn').onclick = async ()=>{
+      await DB.markPaid(group);
+      closeModal();
+      refreshAll();
+      showToast('Đã ghi nhận thanh toán.');
+    };
+  }
+  function closeModal(){ document.getElementById('modalHost').innerHTML=''; }
+  window.closeModal = closeModal;
+
+  function loadRevenueUI(){
+    const pack = Revenue.load();
+    // table
+    const tb = document.getElementById('revenueTable');
+    const entries = Object.values(pack.entries).sort((a,b)=> a.paidAt.localeCompare(b.paidAt));
+    tb.innerHTML = entries.map(e=>{
+      const itemCount = e.items.reduce((s,x)=>s+(x.qty||1),0);
+      return `<tr>
+        <td class="p-1">${e.paidAt.replace('T',' ')}</td>
+        <td class="p-1">${e.tableOrTakeAway}</td>
+        <td class="p-1">#${e.orderId.slice(-6)}</td>
+        <td class="p-1 text-right">${itemCount}</td>
+        <td class="p-1 text-right">${fmtVND(e.amount)}</td>
+        <td class="p-1"></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('todayAmount').textContent = fmtVND(pack.summary.totalAmount||0);
+    document.getElementById('kpiOrdersToday').textContent = entries.length;
+  }
+
+  function renderAdminKPI(){
+    const bytes = new Blob([JSON.stringify(localStorage)]).size;
+    document.getElementById('kpiLocalSize').textContent = (bytes/1024).toFixed(1) + ' KB';
+    document.getElementById('kpiPeers').textContent = STATE.peers;
+    document.getElementById('kpiBandwidth').textContent = hasFirebase? 'Cloud sync (est.)' : 'Local only';
+  }
+
+  /********************
+   * Refresh hub
+   ********************/
+  async function refreshAll(){
+    // staff needs menu + my orders
+    if(STATE.role==='staff'){
+      renderMenu();
+      refreshMyOrders();
+    }
+    // barista
+    if(STATE.role==='barista' || STATE.role==='cashier'){
+      const orders = await DB.listOrders();
+      if(STATE.role==='barista'){
+        const activeTab = document.querySelector('.btab.bg-gray-100')?.dataset?.btab || 'table';
+        renderBaristaTable(orders);
+        renderBaristaItem(orders);
+        document.getElementById('barista-table').classList.toggle('hidden', activeTab!=='table');
+        document.getElementById('barista-item').classList.toggle('hidden', activeTab!=='item');
+      }
+      if(STATE.role==='cashier'){
+        renderCashier(orders);
+        loadRevenueUI();
+      }
+    }
+    if(STATE.role==='admin'){
+      loadRevenueUI();
+      renderAdminKPI();
+    }
+  }
+
+  async function refreshMyOrders(){
+    const orders = await DB.listOrders();
+    // show by current table? For simplicity, show all not paid by this device session
+    renderMyOrders(orders);
+  }
+
+  /********************
+   * CSV Download (Revenue)
+   ********************/
+  function downloadRevenueCSV(){
+    const pack = Revenue.load();
+    const rows = [['paidAt','type','tableOrTakeAway','orderId','itemCount','amount']];
+    for(const e of Object.values(pack.entries)){
+      const type = e.tableOrTakeAway==='Mang về' ? 'takeaway' : 'table';
+      const table = e.tableOrTakeAway==='Mang về' ? '' : e.tableOrTakeAway.replace('Bàn ','');
+      const itemCount = e.items.reduce((s,x)=>s+(x.qty||1),0);
+      rows.push([e.paidAt, type, table||'Mang về', e.orderId, itemCount, e.amount]);
+    }
+    const csv = rows.map(r=> r.map(x=>String(x).replace(/"/g,'""')).map(x=>`"${x}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `revenue_${todayKey().replaceAll('-','')}.csv`;
+    a.click();
+  }
+
+  /********************
+   * Events & Boot
+   ********************/
+  document.getElementById('roleSelect').onchange = (e)=> setRole(e.target.value);
+  document.getElementById('resetBtn').onclick = ()=>{
+    if(confirm('Xoá dữ liệu local hôm nay (orders & revenue)?')) {
+      // naive clean today keys used in Local adapter & Revenue
+      Object.keys(localStorage).forEach(k=>{
+        if(k.startsWith('tnm_orders_today_') || k.startsWith('tnm_revenue_')) localStorage.removeItem(k);
+      });
+      refreshAll();
+      showToast('Đã reset dữ liệu local.');
+    }
+  };
+
+  document.getElementById('categorySelect').onchange = renderMenu;
+  document.querySelectorAll('.qf-btn').forEach(b=> b.onclick = ()=>{
+    document.getElementById('categorySelect').value = b.dataset.qf;
+    renderMenu();
+  });
+  document.getElementById('clearCartBtn').onclick = ()=>{ STATE.cart=[]; renderCart(); };
+  document.getElementById('sendOrderBtn').onclick = sendOrder;
+
+  document.querySelectorAll('.btab').forEach(b=> b.onclick = ()=>{
+    document.querySelectorAll('.btab').forEach(x=>x.classList.remove('bg-gray-100'));
+    b.classList.add('bg-gray-100');
+    document.getElementById('barista-table').classList.toggle('hidden', b.dataset.btab!=='table');
+    document.getElementById('barista-item').classList.toggle('hidden', b.dataset.btab!=='item');
+  });
+
+  document.getElementById('dlRevenueBtn').onclick = downloadRevenueCSV;
+  document.getElementById('saveCfg').onclick = saveConfig;
+
+  // Boot
+  (async function init(){
+    loadConfig();
+    await loadMenuFromCSV();
+    renderCategories();
+    renderMenu();
+    applyRoleFromURL();
+    renderCart();
+    loadRevenueUI();
+    renderAdminKPI();
+    showToast('Sẵn sàng nhận order.');
+  })();
   </script>
 </body>
 </html>
