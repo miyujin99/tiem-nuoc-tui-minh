@@ -362,33 +362,70 @@
     }
 
     /********* CSV Menu *********/
-    async function loadMenuCSV(){
-      const cache = JSON.parse(localStorage.getItem('tnm_menu_csv_cache')||'null');
-      if(cache?.etag){ menuRows=cache.rows; buildMenuIndex(); return; }
-      const res = await fetch('assets/menu.csv?ts='+Date.now());
-      const text = await res.text();
-      const rows=[];
-      text.split(/\r?\n/).forEach((line,idx)=>{
-        if(!line.trim()) return;
-        const parts = line.split(',').map(x=>x.trim());
-        if(idx===0) return; // header
-        const [category,item,size,price] = parts;
-        if(!category || !item || !size) return;
-        const p = Number(price||0); rows.push({category,item,size,price:isNaN(p)?0:p});
-      });
-      menuRows = rows;
-      localStorage.setItem('tnm_menu_csv_cache', JSON.stringify({etag:Date.now(), rows}));
-      buildMenuIndex();
-    }
-    function buildMenuIndex(){
-      const idx={}; const tops=[];
-      for(const r of menuRows){
-        if(r.category==='Topping'){ tops.push({name:r.item, price:r.price}); continue; }
-        if(!idx[r.item]) idx[r.item]={category:r.category, sizes:[]};
-        idx[r.item].sizes.push({size:r.size, price:r.price});
-      }
-      menuIndex=idx; toppings=tops;
-    }
+		async function loadMenuCSV(){
+		  const cache = JSON.parse(localStorage.getItem('tnm_menu_csv_cache')||'null');
+		  if(cache?.etag){ menuRows = cache.rows; buildMenuIndex(); return; }
+		
+		  const res = await fetch('assets/menu.csv?ts='+Date.now());
+		  const raw = await res.text();
+		  const lines = raw.split(/\r?\n/).filter(l=>norm(l).length>0);
+		  if(!lines.length){ menuRows=[]; buildMenuIndex(); return; }
+		
+		  const head = lines[0];
+		  const DELIM = ((head.match(/;/g)||[]).length > (head.match(/,/g)||[]).length) ? ';' : ',';
+		  const splitCSV = (line, d)=>{
+		    let out=[], cur='', q=false;
+		    for(const ch of line){ if(ch==='\"'){ q=!q; continue; } if(ch===d && !q){ out.push(cur); cur=''; } else cur+=ch; }
+		    out.push(cur); return out;
+		  };
+		
+		  const headers = splitCSV(head, DELIM).map(c=>norm(c));
+		  const hIdx = Object.fromEntries(headers.map((h,i)=>[normKey(h), i]));
+		
+		  const rows=[];
+		  for(let i=1;i<lines.length;i++){
+		    const cells = splitCSV(lines[i], DELIM);
+		    const catId  = norm(cells[hIdx['categoryid'] ?? -1] ?? '');
+		    const catLbl = norm(cells[hIdx['category']   ?? 0]  ?? '');
+		    const item   = norm(cells[hIdx['item']       ?? 1]  ?? '');
+		    const size   = norm(cells[hIdx['size']       ?? 2]  ?? '');
+		    const priceRaw = norm(cells[hIdx['price']    ?? 3]  ?? '');
+		    if(!(catLbl||catId) || !item) continue;
+		
+		    const num = Number(priceRaw.replace(/[^\d.,-]/g,'').replace(/\./g,'').replace(',', '.'));
+		    const price = Number.isFinite(num) ? num : 0;
+		
+		    // catKey ưu tiên CategoryID; không có thì fallback về tên chuẩn hóa
+		    const catKey = catId ? normKey(catId) : normKey(catLbl);
+		
+		    rows.push({
+		      categoryId: catId || null,
+		      category: catLbl || (catId||''),
+		      item, size, price,
+		      _key: catKey,        // khóa lọc chính
+		      _ck: normKey(catLbl) // khóa từ nhãn (để tương thích)
+		    });
+		  }
+		
+		  menuRows = rows;
+		  localStorage.setItem('tnm_menu_csv_cache', JSON.stringify({etag:Date.now(), rows}));
+		  buildMenuIndex();
+		}
+
+		function buildMenuIndex(){
+		  const idx = {};
+		  const tops = [];
+		  for(const r of menuRows){
+		    const isTop = (r._key === 'topping' || r._ck === 'topping'); // ưu tiên CategoryID
+		    if(isTop){ tops.push({ name:r.item, price:r.price }); continue; }
+		
+		    if(!idx[r.item]) idx[r.item] = { category: r.category, _key: r._key, sizes: [] };
+		    idx[r.item].sizes.push({ size: r.size, price: r.price });
+		  }
+		  menuIndex = idx;
+		  toppings = tops;
+		}
+
 
     /********* Renderers *********/
     function renderRole(){
@@ -397,78 +434,90 @@
       els.roleSelect.value = role;
     }
 
-    function renderStaff(){
-      // bàn + takeaway
-      els.tableSelect.innerHTML = `<option value="takeaway">Mang về</option>` +
-        Array.from({length:cfg.tables},(_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
-      els.cartTitle.textContent = `Giỏ hàng · ${els.tableSelect.value==='takeaway'?'Mang về':'Bàn '+els.tableSelect.value}`;
-
-      // categories
-      const catSet = new Set(['Tất cả']);
-      menuRows.forEach(r=>{ if(r.category && r.category!=='Topping') catSet.add(r.category); });
-      const curCat = els.catFilter.value || 'Tất cả';
-      els.catFilter.innerHTML = Array.from(catSet).map(c=>`<option value="${c}">${c}</option>`).join('');
-      els.catFilter.value = catSet.has(curCat)?curCat:'Tất cả';
-
-      const kw = (els.searchInput.value||'').toLowerCase();
-      const cat = els.catFilter.value || 'Tất cả';
-      const items = Object.entries(menuIndex)
-        .filter(([name,info])=> (cat==='Tất cả' || info.category===cat) && (!kw || name.toLowerCase().includes(kw)))
-        .map(([name,info])=>({name,...info}));
-
-      els.menuGrid.innerHTML = items.map(it=>{
-        const sizeOpts = it.sizes.map(s=>`<option value="${s.size}|${s.price}">${s.size} — ${money(s.price)}</option>`).join('');
-        const topOpts = toppings.map(t=>`
-          <label class="flex items-center gap-2 text-xs">
-            <input type="checkbox" data-top="${t.name}|${t.price}" class="topping-cb">
-            <span>${t.name} <span class="text-gray-500">+${money(t.price)}</span></span>
-          </label>`).join('');
-        return `<div class="border rounded-xl p-4 hover:shadow-sm flex flex-col gap-2">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="font-semibold text-gray-900">${it.name}</h3>
-              <p class="text-sm text-gray-500">${it.category}</p>
-            </div>
-          </div>
-          <select class="sizeSel w-full border rounded px-2 py-1">${sizeOpts}</select>
-          <textarea class="noteTxt w-full border rounded px-2 py-1 text-sm" rows="1" placeholder="Ghi chú (tuỳ chọn)"></textarea>
-          <details class="rounded border p-2">
-            <summary class="text-xs cursor-pointer">Thêm topping</summary>
-            <div class="mt-2 grid grid-cols-1 gap-1 max-h-28 overflow-auto">${topOpts || '<p class="text-xs text-gray-400">Chưa có topping</p>'}</div>
-          </details>
-          <div class="mt-2 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button class="qtyDec px-2 py-1 border rounded">-</button>
-              <span class="qtyVal w-6 text-center">1</span>
-              <button class="qtyInc px-2 py-1 border rounded">+</button>
-            </div>
-            <button class="addBtn px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
-          </div>
-        </div>`;
-      }).join('');
-
-      // bind per card
-      Array.from(els.menuGrid.children).forEach(card=>{
-        const qtyVal = card.querySelector('.qtyVal');
-        card.querySelector('.qtyDec').onclick = ()=>{ const n=Math.max(1,(+qtyVal.textContent||1)-1); qtyVal.textContent=n; };
-        card.querySelector('.qtyInc').onclick = ()=>{ const n=(+qtyVal.textContent||1)+1; qtyVal.textContent=n; };
-        card.querySelector('.addBtn').onclick = ()=>{
-          const name = card.querySelector('.font-semibold').textContent.trim();
-          const [size, price] = (card.querySelector('.sizeSel').value||'').split('|');
-          const basePrice = Number(price||0);
-          const qty = Number(qtyVal.textContent)||1;
-          const note = card.querySelector('.noteTxt').value.trim();
-          const tops = Array.from(card.querySelectorAll('.topping-cb:checked')).map(cb=>{
-            const [tn,tp] = cb.dataset.top.split('|'); return { id:newId('tp'), name:tn, price:Number(tp||0) };
-          });
-          cart.push({ menuItemId:newId('mi'), name, size, basePrice, qty, toppings:tops, note, itemStatus:'queued' });
-          renderCart();
-        };
-      });
-
-      renderCart();
-      renderMyOrders();
-    }
+		function renderStaff(){
+		  // Bàn/Mang về
+		  els.tableSelect.innerHTML = `<option value="takeaway">Mang về</option>` +
+		    Array.from({length: cfg.tables},(_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
+		  els.cartTitle.textContent = `Giỏ hàng · ${els.tableSelect.value==='takeaway'?'Mang về':'Bàn '+els.tableSelect.value}`;
+		
+		  // Category map: key -> label (bỏ 'topping')
+		  const catMap = new Map();
+		  for(const r of menuRows){
+		    if(r._key && r._key!=='topping') catMap.set(r._key, r.category);
+		  }
+		
+		  const prevKey = els.catFilter.dataset.key || '__all__';
+		  els.catFilter.innerHTML = `<option value="__all__">Tất cả</option>` +
+		    Array.from(catMap.entries()).map(([key,label])=>`<option value="${key}">${label}</option>`).join('');
+		  els.catFilter.value = catMap.has(prevKey) ? prevKey : '__all__';
+		  els.catFilter.dataset.key = els.catFilter.value;
+		
+		  const kw = norm(els.searchInput.value||'').toLowerCase();
+		  const catKey = els.catFilter.value;
+		
+		  const items = Object.entries(menuIndex)
+		    .filter(([name,info])=>{
+		      const byCat = (catKey==='__all__') || (info._key === catKey);
+		      const byKw  = !kw || norm(name).toLowerCase().includes(kw);
+		      return byCat && byKw;
+		    })
+		    .map(([name,info])=>({name, ...info}));
+		
+		  els.menuGrid.innerHTML = items.map(it=>{
+		    const sizeOpts = it.sizes.map(s=>`<option value="${s.size}|${s.price}">${s.size||'Mặc định'} — ${money(s.price)}</option>`).join('');
+		    const topOpts = toppings.length
+		      ? toppings.map(t=>`<label class="flex items-center gap-2 text-xs">
+		          <input type="checkbox" data-top="${t.name}|${t.price}" class="topping-cb">
+		          <span>${t.name} <span class="text-gray-500">+${money(t.price)}</span></span>
+		        </label>`).join('')
+		      : '<p class="text-xs text-gray-400">Chưa có topping</p>';
+		
+		    return `<div class="border rounded-xl p-4 hover:shadow-sm flex flex-col gap-2">
+		      <div class="flex items-start justify-between gap-3">
+		        <div>
+		          <h3 class="font-semibold text-gray-900">${it.name}</h3>
+		          <p class="text-sm text-gray-500">${it.category}</p>
+		        </div>
+		      </div>
+		      <select class="sizeSel w-full border rounded px-2 py-1">${sizeOpts}</select>
+		      <textarea class="noteTxt w-full border rounded px-2 py-1 text-sm" rows="1" placeholder="Ghi chú (tuỳ chọn)"></textarea>
+		      <details class="rounded border p-2">
+		        <summary class="text-xs cursor-pointer">Thêm topping</summary>
+		        <div class="mt-2 grid grid-cols-1 gap-1 max-h-28 overflow-auto">${topOpts}</div>
+		      </details>
+		      <div class="mt-2 flex items-center justify-between">
+		        <div class="flex items-center gap-2">
+		          <button class="qtyDec px-2 py-1 border rounded">-</button>
+		          <span class="qtyVal w-6 text-center">1</span>
+		          <button class="qtyInc px-2 py-1 border rounded">+</button>
+		        </div>
+		        <button class="addBtn px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
+		      </div>
+		    </div>`;
+		  }).join('');
+		
+		  // bind thẻ món
+		  Array.from(els.menuGrid.children).forEach(card=>{
+		    const qtyVal = card.querySelector('.qtyVal');
+		    card.querySelector('.qtyDec').onclick = ()=>{ const n=Math.max(1,(+qtyVal.textContent||1)-1); qtyVal.textContent=n; };
+		    card.querySelector('.qtyInc').onclick = ()=>{ const n=(+qtyVal.textContent||1)+1; qtyVal.textContent=n; };
+		    card.querySelector('.addBtn').onclick = ()=>{
+		      const name = card.querySelector('.font-semibold').textContent.trim();
+		      const [size, price] = (card.querySelector('.sizeSel').value||'').split('|');
+		      const basePrice = Number(price||0);
+		      const qty = Number(qtyVal.textContent)||1;
+		      const note = card.querySelector('.noteTxt').value.trim();
+		      const tops = Array.from(card.querySelectorAll('.topping-cb:checked')).map(cb=>{
+		        const [tn,tp] = cb.dataset.top.split('|'); return { id:newId('tp'), name:tn, price:Number(tp||0) };
+		      });
+		      cart.push({ menuItemId:newId('mi'), name, size, basePrice, qty, toppings:tops, note, itemStatus:'queued' });
+		      renderCart();
+		    };
+		  });
+		
+		  renderCart();
+		  renderMyOrders();
+		}
 
     function renderCart(){
       const list = els.cartList;
@@ -543,100 +592,189 @@
       return m;
     }
 
-    async function renderBarista(){
-      // toggle tab
-      els.tabByTable.classList.toggle('bg-black', baristaTab==='table');
-      els.tabByTable.classList.toggle('text-white', baristaTab==='table');
-      els.tabByItem.classList.toggle('bg-black', baristaTab==='item');
-      els.tabByItem.classList.toggle('text-white', baristaTab==='item');
+// ===== Barista UI: giống ảnh demo, có số thứ tự + nhãn Bổ sung =====
+async function renderBarista(){
+  // toggle tab style
+  els.tabByTable.classList.toggle('bg-black', baristaTab==='table');
+  els.tabByTable.classList.toggle('text-white', baristaTab==='table');
+  els.tabByItem.classList.toggle('bg-black', baristaTab==='item');
+  els.tabByItem.classList.toggle('text-white', baristaTab==='item');
 
-      const orders = (await loadOrders()).filter(o=>o.status!=='paid');
+  const ordersAll = await loadOrders();
+  const active = ordersAll.filter(o => o.status !== 'paid');
 
-      // ==== by table ====
-      const host = els.baristaByTable;
-      host.innerHTML='';
-      const grouped = groupByKey(orders);
-      if(!grouped.size) host.innerHTML='<p class="text-sm text-gray-500">Không có đơn.</p>';
-      for(const [key, arr] of grouped){
-        const title = key==='takeaway' ? 'Mang về' : `Bàn ${key.split('-')[1]}`;
-        const badge = key==='takeaway' ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Ưu tiên</span>` : '';
-        const col = document.createElement('div');
-        col.className='border rounded-xl p-4';
-        col.innerHTML = `<div class="flex items-center justify-between mb-2">
-          <h3 class="font-semibold">${title}</h3>${badge}
+  // Tính thứ tự hàng đợi theo thời gian tạo (tăng dần)
+  const queueSorted = active.slice().sort((a,b)=> a.createdAt - b.createdAt);
+  const qpos = new Map(queueSorted.map((o,i)=> [o.id, i+1])); // id -> số thứ tự
+
+  // Nhóm theo bàn / mang về + gắn "Bổ sung"
+  const grouped = new Map();
+  active.forEach(o=>{
+    const k = o.type==='takeaway' ? 'takeaway' : `table-${o.table}`;
+    const arr = grouped.get(k) || [];
+    arr.push(o); grouped.set(k, arr);
+  });
+  for(const [,arr] of grouped){
+    arr.sort((a,b)=> a.createdAt - b.createdAt);
+    arr.forEach((o,i)=> o.__supp = i>0); // true nếu là đơn bổ sung
+  }
+
+  // ===== BY TABLE =====
+  const host = els.baristaByTable;
+  host.innerHTML = '';
+  if(grouped.size===0){
+    host.innerHTML = '<p class="text-sm text-gray-500">Không có đơn.</p>';
+  } else {
+    // sắp xếp theo số bàn tăng dần, Mang về đứng trước
+    const entries = Array.from(grouped.entries()).sort((a,b)=>{
+      if(a[0]==='takeaway') return -1;
+      if(b[0]==='takeaway') return 1;
+      return Number(a[0].split('-')[1]) - Number(b[0].split('-')[1]);
+    });
+
+    entries.forEach(([key, orders])=>{
+      const title = key==='takeaway' ? 'Mang về' : `Bàn ${key.split('-')[1]}`;
+      const badgeRight = `<span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${orders.length} đơn</span>`;
+      const priBadge = key==='takeaway'
+        ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Ưu tiên</span>`
+        : '';
+
+      const col = document.createElement('div');
+      col.className = 'border rounded-xl p-4';
+      col.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">${title}</h3>
+          <div class="flex items-center gap-2">${priBadge}${badgeRight}</div>
         </div>
-        <div class="space-y-3"></div>`;
-        const list = col.querySelector('.space-y-3');
+        <div class="space-y-3"></div>
+      `;
 
-        arr.forEach(o=>{
-          const itemsHtml = o.items.map((it,idx)=>{
-            const tops = (it.toppings||[]).map(t=>t.name).join(', ');
-            return `<div class="border rounded p-2">
-              <div class="flex items-center justify-between">
-                <div class="font-medium text-sm">${it.name} — ${it.size} × ${it.qty}</div>
-                <span class="text-xs ${it.itemStatus==='delivered'?'text-emerald-700':'text-gray-500'}">${it.itemStatus}</span>
+      const list = col.querySelector('.space-y-3');
+      orders.forEach(o=>{
+        // danh sách món (theo item-level)
+        const itemsHtml = o.items.map((it,idx)=>{
+          const tops = (it.toppings||[]).map(t=>t.name).join(', ');
+          const statusTxt = it.itemStatus==='delivered' ? 'Đã giao' : 'Chờ pha';
+          const statusCls = it.itemStatus==='delivered' ? 'text-emerald-700' : 'text-gray-500';
+          return `
+            <li class="list-disc list-inside">
+              ${it.name} × ${it.qty}
+              <div class="text-xs text-gray-500 ml-5">${tops||'Không topping'}${it.note ? ' · '+it.note : ''}</div>
+              <div class="mt-1 ml-5 flex items-center justify-between">
+                <span class="text-xs ${statusCls}">${statusTxt}</span>
+                <button data-deliver="${o.id}|${idx}" class="text-xs px-3 py-1 rounded bg-emerald-600 text-white ${it.itemStatus==='delivered'?'opacity-40 pointer-events-none':''}">
+                  Đã giao
+                </button>
               </div>
-              <div class="text-xs text-gray-500">${tops||'Không topping'}${it.note ? ' · '+it.note : ''}</div>
-              <div class="mt-1 text-right">
-                <button data-deliver="${o.id}|${idx}" class="text-xs px-2 py-1 border rounded ${it.itemStatus==='delivered'?'opacity-40 pointer-events-none':''}">Đã giao</button>
-              </div>
-            </div>`;
-          }).join('');
+            </li>`;
+        }).join('');
 
-          list.innerHTML += `<div class="bg-gray-50 rounded p-2">
+        list.innerHTML += `
+          <div class="rounded-lg border p-3">
             <div class="flex items-center justify-between">
-              <div class="text-sm">Đơn <span class="font-semibold">#${shortId(o.id)}</span>${o.__supp?' · <span class="text-amber-600">Bổ sung</span>':''} · ${fmtTime(o.createdAt)}</div>
-              <button data-deliver-all="${o.id}" class="text-xs px-2 py-1 border rounded">Giao hết</button>
+              <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-full bg-black text-white text-xs grid place-items-center font-semibold">
+                  ${qpos.get(o.id) || ''}
+                </span>
+                <p class="text-sm text-gray-700">
+                  #${o.id ? o.id.slice(-4) : ''} · ${o.__supp ? 'Bổ sung' : 'Đơn đầu'} · ${fmtTime(o.createdAt)}
+                </p>
+              </div>
+              <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">Chờ pha</span>
             </div>
-            <div class="mt-2 space-y-2">${itemsHtml}</div>
+            <ul class="mt-2 text-sm">
+              ${itemsHtml}
+            </ul>
+            <div class="mt-3">
+              <button data-deliver-all="${o.id}" class="px-3 py-1 rounded-lg border">Giao hết</button>
+            </div>
           </div>`;
-        });
+      });
 
-        host.appendChild(col);
+      host.appendChild(col);
+    });
+  }
+
+  // gắn sự kiện one-click cho từng món / giao hết
+  host.querySelectorAll('[data-deliver]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const [oid, idx] = btn.dataset.deliver.split('|');
+      await DB.setItemStatus(oid, Number(idx), 'delivered');
+      refreshAll();
+    };
+  });
+  host.querySelectorAll('[data-deliver-all]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const oid = btn.dataset.deliverAll;
+      const orders = await loadOrders();
+      const o = orders.find(x=>x.id===oid); if(!o) return;
+      for(let i=0;i<o.items.length;i++){
+        if(o.items[i].itemStatus !== 'delivered'){
+          await DB.setItemStatus(oid, i, 'delivered');
+        }
       }
+      refreshAll();
+    };
+  });
 
-      host.querySelectorAll('[data-deliver]').forEach(b=>b.onclick=async()=>{
-        const [oid,idx]=b.dataset.deliver.split('|');
-        await DB.setItemStatus(oid, Number(idx), 'delivered');
-        refreshAll();
+  // ===== BY ITEM (tổng món) =====
+  const byItemHost = els.baristaByItem;
+  const occurrences = [];
+  active.forEach(o=>{
+    o.items.forEach((it,idx)=>{
+      occurrences.push({
+        order:o, idx,
+        name:it.name, qty:it.qty,
+        status: it.itemStatus,
       });
-      host.querySelectorAll('[data-deliver-all]').forEach(b=>b.onclick=async()=>{
-        const oid=b.dataset.deliverAll;
-        const orders = await loadOrders();
-        const o = orders.find(x=>x.id===oid); if(!o) return;
-        for(let i=0;i<o.items.length;i++){ if(o.items[i].itemStatus!=='delivered') await DB.setItemStatus(oid,i,'delivered'); }
-        refreshAll();
-      });
+    });
+  });
+  // theo thời gian + gom nhóm hiển thị như ảnh
+  occurrences.sort((a,b)=> a.order.createdAt - b.order.createdAt);
 
-      // ==== by item ====
-      const wait = [];
-      orders.forEach(o=>o.items.forEach((it,i)=> wait.push({order:o,item:it,idx:i})));
-      wait.sort((a,b)=>a.order.createdAt-b.order.createdAt);
-      els.baristaByItem.innerHTML = wait.map(rec=>{
-        const tops=(rec.item.toppings||[]).map(t=>t.name).join(', ');
-        const badge = rec.order.type==='takeaway'
-          ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Mang về</span>`
-          : `<span class="badge border bg-blue-100 text-blue-700 border-blue-300 px-2 py-0.5 rounded">Bàn ${rec.order.table}</span>`;
-        return `<div class="border rounded-xl p-2">
-          <div class="flex items-center justify-between">
-            <div class="text-sm font-medium">${rec.item.name} — ${rec.item.size} × ${rec.item.qty}</div>
-            ${badge}
+  // gộp theo tên món để vẽ box
+  const groups = new Map();
+  occurrences.forEach(r=>{
+    const g = groups.get(r.name) || { total:0, rows:[] };
+    g.total += r.qty;
+    g.rows.push(r);
+    groups.set(r.name, g);
+  });
+
+  byItemHost.innerHTML = Array.from(groups.entries()).map(([name,g])=>{
+    const rows = g.rows.map(r=>{
+      const badge = r.order.type==='takeaway'
+        ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Mang về</span>`
+        : `<span class="badge border bg-blue-100 text-blue-700 border-blue-300 px-2 py-0.5 rounded">Bàn ${r.order.table}</span>`;
+      return `
+        <div class="flex items-center justify-between text-sm">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-black text-white grid place-items-center text-[10px]">
+              ${qpos.get(r.order.id) || ''}
+            </span>
+            <span>
+              ${r.order.type==='takeaway' ? 'Mang về' : `Bàn ${r.order.table}`} · #${r.order.id.slice(-4)} ${r.order.__supp?'· Bổ sung':''} · ${fmtTime(r.order.createdAt)} · ×${r.qty}
+            </span>
           </div>
-          <div class="text-xs text-gray-500">${tops||'Không topping'}${rec.item.note?' · '+rec.item.note:''}</div>
-          <div class="mt-1 text-right">
-            <button data-deliver="${rec.order.id}|${rec.idx}" class="text-xs px-2 py-1 border rounded ${rec.item.itemStatus==='delivered'?'opacity-40 pointer-events-none':''}">Đã giao</button>
-          </div>
+          ${badge}
         </div>`;
-      }).join('') || '<p class="text-sm text-gray-500">Không có món.</p>';
+    }).join('');
 
-      els.baristaByItem.querySelectorAll('[data-deliver]').forEach(b=>b.onclick=async()=>{
-        const [oid,idx]=b.dataset.deliver.split('|'); await DB.setItemStatus(oid,Number(idx),'delivered'); refreshAll();
-      });
+    return `
+      <div class="border rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-semibold">${name}</h4>
+          <span class="text-sm font-bold">${g.total}</span>
+        </div>
+        <div class="space-y-1">${rows}</div>
+      </div>`;
+  }).join('') || '<p class="text-sm text-gray-500">Không có món.</p>';
 
-      // toggle
-      els.baristaByTable.classList.toggle('hidden', baristaTab!=='table');
-      els.baristaByItem.classList.toggle('hidden',  baristaTab!=='item');
-    }
+  // toggle 2 tab
+  els.baristaByTable.classList.toggle('hidden', baristaTab!=='table');
+  els.baristaByItem.classList.toggle('hidden',  baristaTab!=='item');
+}
+
 
     let cashierBound=false;
     async function renderCashier(){
@@ -760,7 +898,16 @@
     });
     els.catFilter.addEventListener('change', renderStaff);
     els.searchInput.addEventListener('input', renderStaff);
-    document.querySelectorAll('.qf').forEach(b=> b.addEventListener('click', ()=>{ els.catFilter.value=b.textContent.trim(); renderStaff(); }));
+    document.querySelectorAll('.qf').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const label = norm(btn.textContent);
+    const opt = Array.from(els.catFilter.options).find(o=>norm(o.textContent)===label);
+    els.catFilter.value = opt ? opt.value : '__all__';   // value = CategoryID
+    els.catFilter.dataset.key = els.catFilter.value;
+    renderStaff();
+  });
+});
+
     els.tableSelect.addEventListener('change', ()=>{ els.cartTitle.textContent = `Giỏ hàng · ${els.tableSelect.value==='takeaway'?'Mang về':'Bàn '+els.tableSelect.value}`; });
     els.btnSubmitOrder.addEventListener('click', submitOrder);
     els.tabByTable.addEventListener('click', ()=>{ baristaTab='table'; renderBarista(); });
