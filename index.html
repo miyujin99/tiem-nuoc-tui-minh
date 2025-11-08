@@ -2,8 +2,8 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiệm Nước Tụi Mình · POS + Dashboard</title>
+<meta id="metaViewport" name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiệm Nước Tụi Mình · POS + Dashboard (v2.2 – toast-only-new-order + webaudio-beep)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .modal-enter{opacity:0;transform:translateY(6px)}
@@ -12,12 +12,20 @@
     .toast-enter-active{opacity:1;transform:translateY(0);transition:all .2s ease}
     .badge{font-size:.72rem}
     .hide-scroll::-webkit-scrollbar{display:none}
+	html{scroll-behavior:smooth}
+    .force-desktop body { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+    .force-desktop .text-xs { font-size: .8rem; }
+    .force-desktop .text-sm { font-size: .95rem; }
+    .force-desktop .text-base { font-size: 1.05rem; }
+	.qf { transition: transform .08s ease, box-shadow .08s ease; }
+	.qf:active { transform: translateY(1px); }
+
   </style>
 </head>
 <body class="min-h-screen bg-gray-100">
   <!-- Header -->
   <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+<div class="w-full px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="text-2xl">🧋</span>
         <div>
@@ -25,77 +33,144 @@
           <p class="text-xs text-gray-500">HTML + Tailwind · Firebase/Local · CSV menu</p>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm">
-          <option value="staff">Nhân viên (Gọi món)</option>
-          <option value="barista">Quầy pha chế</option>
-          <option value="cashier">Thu ngân</option>
-          <option value="admin">Quản lý</option>
-        </select>
-        <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset đơn</button>
-      </div>
+<div class="flex items-center gap-3">
+  <button id="btnJumpCartHeader"
+          class="hidden text-sm px-3 py-2 rounded-lg border bg-emerald-600 text-white hover:bg-emerald-700">
+    🛒 Xem giỏ <span id="cartCountHeader" class="ml-1"></span>
+  </button>
+
+  <select id="roleSelect" class="border rounded-lg px-3 py-2 text-sm">
+    <option value="staff">Nhân viên (Gọi món)</option>
+    <option value="barista">Quầy pha chế</option>
+    <option value="cashier">Thu ngân</option>
+    <option value="admin">Quản lý</option>
+  </select>
+
+  <button id="btnResetData" class="text-sm px-3 py-2 border rounded-lg">Reset đơn</button>
+</div>
+
     </div>
   </header>
+  
 
-  <!-- Toasts + sound -->
+  <!-- Dev Panel -->
+  <div id="devPanel" class="hidden mx-auto max-w-6xl px-4 mt-3">
+    <div class="rounded-xl border bg-amber-50 text-amber-900 px-4 py-3 flex items-center justify-between">
+      <div class="text-sm">
+        <strong>Local Dev Mode:</strong> Đang chạy file trực tiếp / chưa fetch được <code>assets/menu.csv</code>.
+        <span class="ml-2">Chọn CSV trên máy để nạp menu.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="csvPicker" type="file" accept=".csv,text/csv" class="hidden" />
+        <button id="btnPickCSV" class="px-3 py-1.5 rounded border bg-white text-sm">Chọn CSV</button>
+        <button id="btnSeedSample" class="px-3 py-1.5 rounded border bg-white text-sm">Sinh đơn mẫu</button>
+        <button id="btnHideDev" class="px-3 py-1.5 rounded border bg-white text-sm">Ẩn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast host -->
   <div id="toastHost" class="fixed left-3 top-16 space-y-2 z-50"></div>
-  <audio id="ping" preload="auto" class="hidden">
-    <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQA…AAA" type="audio/mp3">
-  </audio>
 
   <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-    <!-- STAFF -->
-    <section id="view-staff" class="hidden">
-      <div class="grid md:grid-cols-3 gap-6">
-        <div class="md:col-span-2 space-y-4">
-          <section class="bg-white rounded-2xl shadow-sm border p-5">
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-xl font-semibold text-gray-900">Chọn bàn & Menu</h2>
-              <div class="flex items-center gap-3">
-                <select id="tableSelect" class="border rounded-lg px-3 py-2 text-sm"></select>
-                <select id="catFilter" class="border rounded-lg px-3 py-2 text-sm"></select>
-                <input id="searchInput" class="border rounded-lg px-3 py-2 text-sm w-48" placeholder="Tìm món..." />
-              </div>
-            </div>
-            <div class="flex gap-2 mb-3">
-              <button class="qf px-3 py-1 text-xs border rounded">Cà phê</button>
-              <button class="qf px-3 py-1 text-xs border rounded">Matcha</button>
-              <button class="qf px-3 py-1 text-xs border rounded">Trà sữa & Trà</button>
-              <button class="qf px-3 py-1 text-xs border rounded">Đồ ăn vặt</button>
-            </div>
-            <div id="menuGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-          </section>
-        </div>
-        <div class="space-y-4">
-          <section class="bg-white rounded-2xl shadow-sm border p-5">
-            <h2 id="cartTitle" class="text-xl font-semibold text-gray-900 mb-3">Giỏ hàng</h2>
-            <div id="cartList" class="space-y-3 text-sm text-gray-700">Chưa có món.</div>
-            <div class="pt-3 mt-2 border-t flex items-center justify-between">
-              <span class="font-semibold">Tổng</span>
-              <span id="cartTotal" class="font-bold">0₫</span>
-            </div>
-            <button id="btnSubmitOrder" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 mt-3">Gửi order đến quầy pha chế</button>
-          </section>
-          <section class="bg-white rounded-2xl shadow-sm border p-5">
-            <h2 class="text-xl font-semibold text-gray-900 mb-3">Các đơn của tôi (chưa thanh toán)</h2>
-            <div id="recentOrders" class="space-y-2 max-h-80 overflow-auto pr-1"></div>
-          </section>
+<!-- STAFF -->
+<section id="view-staff" class="hidden">
+  <div class="space-y-4 w-full max-w-none mx-auto">
+
+    <!-- Anchor đầu menu -->
+    <div id="menuTop"></div>
+
+    <!-- Chọn bàn & Menu -->
+    <section class="bg-white rounded-2xl shadow-sm border p-5">
+<div class="flex items-center justify-between mb-3">
+  <h2 class="text-xl font-semibold text-gray-900">Chọn bàn & Menu</h2>
+  <button id="btnJumpCart"
+          class="text-xs px-3 py-1 rounded-lg border bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+    🛒 Xem giỏ <span id="cartCount" class="ml-1"></span>
+  </button>
+</div>
+
+
+      <div class="flex items-center gap-4 mb-3">
+
+        <select id="tableSelect" class="border rounded-lg px-3 py-2 text-sm"></select>
+        <select id="catFilter" class="border rounded-lg px-3 py-2 text-sm" data-key="__all__"></select>
+        <div class="relative">
+          <input id="searchInput" class="border rounded-lg pl-3 pr-8 py-2 text-sm w-48" placeholder="Tìm món..." />
+          <button id="clearSearchBtn"
+                  class="absolute right-1.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 text-lg font-bold hidden leading-none"
+                  title="Xóa tìm kiếm">×</button>
         </div>
       </div>
+
+<div class="flex flex-wrap gap-3 md:gap-4 mb-3">
+  <button class="qf border px-4 py-2.5 text-base rounded-xl font-medium shadow-sm min-w-[112px] h-11">Cà phê</button>
+  <button class="qf border px-4 py-2.5 text-base rounded-xl font-medium shadow-sm min-w-[112px] h-11">Matcha</button>
+  <button class="qf border px-4 py-2.5 text-base rounded-xl font-medium shadow-sm min-w-[112px] h-11">Trà sữa & Trà</button>
+  <button class="qf border px-4 py-2.5 text-base rounded-xl font-medium shadow-sm min-w-[112px] h-11">Đồ ăn vặt</button>
+  <button class="qf border px-4 py-2.5 text-base rounded-xl font-medium shadow-sm min-w-[112px] h-11">Món mới</button>
+</div>
+
+
+
+        <!-- Menu: full width, không sidebar -->
+  <div class="max-w-[1600px] mx-auto">
+<div id="menuGrid" class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]"></div>
+  </div>
+</section>
+
+
+<div class="grid md:grid-cols-2 gap-4 items-start">
+  <!-- Giỏ hàng (đặt dưới menu) -->
+  <section id="cartSection" class="bg-white rounded-2xl shadow-sm border p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="cartTitle" class="text-xl font-semibold text-gray-900">Giỏ hàng</h2>
+        <!-- Nút nhảy lên đầu menu -->
+        <button id="btnJumpTop"
+                class="text-xs px-3 py-1 rounded-lg border bg-gray-50 text-gray-700">
+          ⬆️ Lên đầu menu
+        </button>
+      </div>
+
+      <div id="cartList" class="space-y-3 text-sm text-gray-700">Chưa có món.</div>
+      <div class="pt-3 mt-2 border-t flex items-center justify-between">
+        <span class="font-semibold">Tổng</span>
+        <span id="cartTotal" class="font-bold">0₫</span>
+      </div>
+      <button id="btnSubmitOrder"
+              class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 mt-3">
+        Gửi order đến quầy pha chế
+      </button>
     </section>
+
+<!-- Các đơn của tôi -->
+  <section id="recentSection" class="bg-white rounded-2xl shadow-sm border p-5">
+    <h2 class="text-xl font-semibold text-gray-900 mb-3">Các đơn của tôi (chưa thanh toán)</h2>
+    <div id="recentOrders" class="space-y-2"></div>
+  </section>
+</div>
+</section>
+
 
     <!-- BARISTA -->
     <section id="view-barista" class="hidden space-y-4">
+      <!-- HÀNG ĐỢI PHA CHẾ -->
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xl font-semibold text-gray-900">Hàng đợi pha chế</h2>
           <div class="flex items-center gap-2 text-sm">
             <button id="tabByTable" class="px-3 py-1 rounded-lg border bg-black text-white">Xem theo bàn</button>
-            <button id="tabByItem" class="px-3 py-1 rounded-lg border">Xem theo món</button>
+            <button id="tabByItem" class="px-3 py-1 rounded-lg border">Xem tổng món</button>
           </div>
         </div>
         <div id="baristaByTable" class="grid md:grid-cols-2 gap-4"></div>
         <div id="baristaByItem" class="grid md:grid-cols-3 gap-4 hidden"></div>
+      </section>
+
+      <!-- ĐÃ GIAO · CHỜ THANH TOÁN -->
+      <section class="bg-white rounded-2xl shadow-sm border p-5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Đã giao · chờ thanh toán</h2>
+        <div id="baristaToPay" class="space-y-3"></div>
       </section>
     </section>
 
@@ -131,45 +206,29 @@
 
     <!-- ADMIN + DASHBOARD -->
     <section id="view-admin" class="hidden grid md:grid-cols-2 gap-6">
-      <!-- Dashboard -->
       <section class="bg-white rounded-2xl shadow-sm border p-5 md:col-span-2">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xl font-semibold text-gray-900">Dashboard (Realtime)</h2>
           <span class="text-xs text-gray-500">Tự cập nhật</span>
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Tổng đơn hôm nay</p>
-            <p id="kpiOrders" class="text-3xl font-bold">—</p>
-          </div>
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Dung lượng local ước tính</p>
-            <p class="text-lg font-semibold"><span id="kpiStorage">—</span></p>
-          </div>
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Thiết bị online</p>
-            <p id="kpiOnline" class="text-3xl font-bold">—</p>
-          </div>
-          <div class="border rounded-xl p-4">
-            <p class="text-sm text-gray-500">Chế độ đồng bộ</p>
-            <p id="kpiBandwidth" class="text-lg font-semibold">Local only</p>
-          </div>
+          <div class="border rounded-xl p-4"><p class="text-sm text-gray-500">Tổng đơn hôm nay</p><p id="kpiOrders" class="text-3xl font-bold">—</p></div>
+          <div class="border rounded-xl p-4"><p class="text-sm text-gray-500">Dung lượng local ước tính</p><p class="text-lg font-semibold"><span id="kpiStorage">—</span></p></div>
+          <div class="border rounded-xl p-4"><p class="text-sm text-gray-500">Thiết bị online</p><p id="kpiOnline" class="text-3xl font-bold">—</p></div>
+          <div class="border rounded-xl p-4"><p class="text-sm text-gray-500">Chế độ đồng bộ</p><p id="kpiBandwidth" class="text-lg font-semibold">Local only</p></div>
         </div>
       </section>
 
-      <!-- Config -->
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Cấu hình quán</h2>
         <label class="text-sm text-gray-700">Số lượng bàn</label>
         <input id="tablesInput" type="number" min="1" class="border rounded-lg px-3 py-2 w-40" />
-        <div class="mt-3">
-          <button id="btnSaveAdmin" class="px-4 py-2 rounded-lg bg-black text-white">Lưu</button>
-        </div>
-        <p class="text-xs text-gray-500 mt-2">Menu lấy từ <code>assets/menu.csv</code>. Không dùng JSON.</p>
+        <div class="mt-3"><button id="btnSaveAdmin" class="px-4 py-2 rounded-lg bg-black text-white">Lưu</button></div>
+        <p class="text-xs text-gray-500 mt-2">Menu lấy từ <code>assets/menu.csv</code> hoặc CSV bạn chọn khi chạy local.</p>
       </section>
       <section class="bg-white rounded-2xl shadow-sm border p-5">
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Ghi chú</h2>
-        <p class="text-sm text-gray-600">• Topping lấy từ dòng CSV có <strong>Category = Topping</strong>.<br/>• Đơn = <em>delivered</em> khi mọi <em>item</em> đều delivered.</p>
+        <p class="text-sm text-gray-600">• Dòng có <strong>CategoryID=topping</strong> hoặc <strong>Category=Topping</strong> sẽ thành topping.<br/>• Đơn = <em>delivered</em> khi mọi <em>item</em> đều delivered.</p>
       </section>
     </section>
   </main>
@@ -194,45 +253,55 @@
   </div>
 
   <script>
-    /********* Utils *********/
+    /* ========== Utils ========== */
     const STORAGE_KEY_CFG = 'tiemnuoctuiminh_pos_v1_html';
     const ORDERS_KEY = () => 'tnm_orders_'+new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'});
     const REVENUE_KEY = () => 'tnm_revenue_'+new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).replaceAll('-','');
-
     const money = n => (n||0).toLocaleString('vi-VN')+'₫';
     const now = () => Date.now();
     const newId = p => p+'_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
     const shortId = id => id ? id.slice(-6) : '';
     const fmtTime = ts => { try{ return new Date(ts).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); } catch{ return ''; } };
     const fmtISO = () => new Date().toLocaleString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).replace('T',' ');
+    const norm = (s)=> (s??'').toString().normalize('NFC').replace(/^\uFEFF/,'').trim();
+    const normKey = (s)=> norm(s).toLowerCase();
 
-    // toast + beep
+    /* ========== Notifications & Sound (ONLY new-order) ========== */
+    let AC=null, audioReady=false;
+    function unlockAudioOnce(){
+      if(audioReady) return;
+      try{ AC = new (window.AudioContext||window.webkitAudioContext)(); audioReady = true; }catch{}
+    }
+    document.addEventListener('pointerdown', unlockAudioOnce, {once:true});
+    document.addEventListener('keydown', unlockAudioOnce, {once:true});
+
+	function ping(){
+	  const audio = document.getElementById('soundBell');
+	  if(!audio) return;
+	  audio.currentTime = 0;
+	  audio.play().catch(()=>{}); // tránh lỗi autoplay
+	}
+
+
     const toastHost = document.getElementById('toastHost');
-    let toastQ=[], toastRun=false;
-    const ping = ()=>{ try{ const a=document.getElementById('ping'); a.currentTime=0; a.play(); }catch{} };
-    function toast(msg){ toastQ.push(msg); if(!toastRun) nextToast(); }
-    function nextToast(){
-      if(!toastQ.length){ toastRun=false; return; }
-      toastRun=true;
-      const msg = toastQ.shift();
-      const el = document.createElement('div');
+    function showToast(msg){
+      const el=document.createElement('div');
       el.className='toast-enter bg-white border shadow rounded-lg px-3 py-2 text-sm max-w-xs';
-      el.innerHTML = `<div class="flex items-start gap-2"><span>🔔</span><div class="flex-1">${msg}</div><button class="text-gray-400 hover:text-gray-700" onclick="this.parentElement.parentElement.remove()">×</button></div>`;
-      toastHost.appendChild(el);
-      requestAnimationFrame(()=>el.classList.add('toast-enter-active'));
-      setTimeout(()=>{ el.remove(); nextToast(); }, 3000);
+      el.innerHTML=`<div class="flex items-start gap-2"><span>🔔</span><div class="flex-1">${msg}</div><button class="text-gray-400 hover:text-gray-700" onclick="this.closest('div.toast-enter').remove()">×</button></div>`;
+      toastHost.appendChild(el); requestAnimationFrame(()=> el.classList.add('toast-enter-active'));
+      setTimeout(()=> el.remove(), 3000);
+    }
+    function notifyNewOrder(order){
+      const label = order.type==='takeaway' ? 'Mang về' : ('Bàn '+order.table);
+      showToast(`Có đơn mới: ${label} · ${order.items.length} món`);
+      ping();
     }
 
-    /********* State *********/
+    /* ========== Elements & State ========== */
     const els = {
       roleSelect: document.getElementById('roleSelect'),
       btnResetData: document.getElementById('btnResetData'),
-      views: {
-        staff: document.getElementById('view-staff'),
-        barista: document.getElementById('view-barista'),
-        cashier: document.getElementById('view-cashier'),
-        admin: document.getElementById('view-admin'),
-      },
+      views: { staff:document.getElementById('view-staff'), barista:document.getElementById('view-barista'), cashier:document.getElementById('view-cashier'), admin:document.getElementById('view-admin') },
       tableSelect: document.getElementById('tableSelect'),
       catFilter: document.getElementById('catFilter'),
       searchInput: document.getElementById('searchInput'),
@@ -253,7 +322,6 @@
       btnSaveAdmin: document.getElementById('btnSaveAdmin'),
       revenueTable: document.getElementById('revenueTable'),
       dlRevenueBtn: document.getElementById('dlRevenueBtn'),
-      // modal
       payModal: document.getElementById('payModal'),
       payTitle: document.getElementById('payTitle'),
       payLines: document.getElementById('payLines'),
@@ -261,14 +329,49 @@
       btnClosePay: document.getElementById('btnClosePay'),
       btnCancelPay: document.getElementById('btnCancelPay'),
       btnConfirmPay: document.getElementById('btnConfirmPay'),
-      // KPI
       kpiOrders: document.getElementById('kpiOrders'),
       kpiStorage: document.getElementById('kpiStorage'),
       kpiOnline: document.getElementById('kpiOnline'),
       kpiBandwidth: document.getElementById('kpiBandwidth'),
     };
+	// === Quick Filter UI (orange when active)
+const QF_ON  = ['bg-orange-100','text-orange-700','border-orange-300'];
+const QF_OFF = ['bg-white','text-gray-700','border-gray-300'];
+// Kích thước/nét to cho quick filter
+const QF_SIZE = ['px-4','py-2.5','text-base','rounded-xl','font-medium','shadow-sm','min-w-[112px]','h-11'];
 
-    // session role
+function setQFState(btn, active){
+  // bỏ hết lớp cũ rồi áp kích thước + viền + trạng thái
+  btn.className = 'qf'; // giữ lại class qf để code khác vẫn tìm được
+  btn.classList.add('border', ...QF_SIZE, ...(active ? QF_ON : QF_OFF));
+}
+
+
+
+
+// Gọi sau mỗi lần renderStaff hoặc đổi category để tô màu nút đang chọn
+function updateQuickFiltersUI(){
+  const curLabel = [...els.catFilter.options]
+    .find(o => o.value === els.catFilter.value)?.textContent.trim();
+  document.querySelectorAll('.qf').forEach(b=>{
+    setQFState(b, b.textContent.trim() === curLabel);
+  });
+}
+// === Dropdown & Cart color styling ===
+function tintDropdowns(){
+  // Category dropdown = cam nhạt
+  els.catFilter.classList.add('bg-orange-50','border-orange-300','text-amber-800');
+  // Bàn dropdown = xanh lá
+  els.tableSelect.classList.add('bg-emerald-100','border-emerald-300','text-emerald-800','font-medium');
+}
+
+function updateCartTitle(){
+  const label = els.tableSelect.value==='takeaway'
+    ? 'Mang về'
+    : `Bàn ${els.tableSelect.value}`;
+  els.cartTitle.innerHTML = `Giỏ hàng · <span class="text-emerald-700 font-semibold">${label}</span>`;
+}
+
     const ROLES = ['staff','barista','cashier','admin'];
     let role = (sessionStorage.getItem('tn_role')||'staff');
     const qsRole = new URLSearchParams(location.search).get('role');
@@ -276,36 +379,64 @@
     [qsRole,hashRole].some(v=>{ if(ROLES.includes(String(v))) { role=String(v); return true; } return false; });
 
     let cfg = loadCfg();
-    let menuRows = [];           // [{category,item,size,price}]
-    let menuIndex = {};          // name -> {category, sizes:[{size, price}]}
-    let toppings = [];           // [{name, price}]
-    let cart = [];               // [{menuItemId,name,size,basePrice,qty,toppings[],note,itemStatus}]
+    let menuRows = [];     // raw from CSV
+    let menuIndex = {};    // item -> {category,_key,sizes[]}
+    let toppings = [];     // [{name,price}]
+    let cart = [];         // order draft items
     let baristaTab = 'table';
-    let viewingGroup = null;     // {type, table}
-    let viewingOrderId = null;
+    let viewingGroup = null;
 
     const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('tnm_pos') : null;
-    if(bc){ bc.addEventListener('message', e=>{ if(e?.data?.type==='orders-updated'){ refreshAll(); } if(e?.data?.type==='revenue-updated'){ loadRevenueUI(); } }); }
+    if(bc){
+  bc.addEventListener('message', e=>{
+    if(e?.data?.type==='orders-updated'){ refreshAll(); }
+    if(e?.data?.type==='revenue-updated'){ renderCashier(); } // đổi tên hàm ở đây
+  });
+}
 
-    function loadCfg(){
-      try{
-        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY_CFG) || '{}');
-        return { tables: raw.tables || 20, mode: raw.mode || 'local' };
-      }catch{ return { tables:20, mode:'local' }; }
-    }
-    function saveCfg(){
-      localStorage.setItem(STORAGE_KEY_CFG, JSON.stringify({ tables: cfg.tables, mode: cfg.mode }));
+
+    function loadCfg(){ try{ const raw=JSON.parse(localStorage.getItem(STORAGE_KEY_CFG)||'{}'); return { tables: raw.tables||20, mode: raw.mode||'local' }; }catch{ return { tables:20, mode:'local' }; } }
+    function saveCfg(){ localStorage.setItem(STORAGE_KEY_CFG, JSON.stringify({ tables: cfg.tables, mode: cfg.mode })); }
+
+    /* ========== Local Dev Detection & CSV from file ========== */
+    const IS_FILE = location.protocol === 'file:';
+    let DEV_FORCE = false;
+    function showDevPanel(show=true){ const p=document.getElementById('devPanel'); if(!p) return; p.classList.toggle('hidden', !show); }
+    async function importCSVFromFile(file){ const text = await file.text(); await parseCSVTextAndCache(text); buildMenuIndex(); await refreshAll(); }
+    async function parseCSVTextAndCache(raw){
+      const lines = raw.split(/\r?\n/).filter(l=>norm(l).length>0);
+      if(!lines.length){ menuRows=[]; localStorage.removeItem('tnm_menu_csv_cache'); return; }
+      const head = lines[0];
+      const DELIM = ((head.match(/;/g)||[]).length > (head.match(/,/g)||[]).length) ? ';' : ',';
+      const splitCSV = (line, d)=>{ let out=[], cur='', q=false; for(const ch of line){ if(ch==='\"'){ q=!q; continue; } if(ch===d && !q){ out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out; };
+      const headers = splitCSV(head, DELIM).map(c=>norm(c));
+      const hIdx = Object.fromEntries(headers.map((h,i)=>[normKey(h), i]));
+      const rows=[];
+      for(let i=1;i<lines.length;i++){
+        const cells = splitCSV(lines[i], DELIM);
+        const catId  = norm(cells[hIdx['categoryid'] ?? -1] ?? '');
+        const catLbl = norm(cells[hIdx['category']   ?? 0]  ?? '');
+        const item   = norm(cells[hIdx['item']       ?? 1]  ?? '');
+        const size   = norm(cells[hIdx['size']       ?? 2]  ?? '');
+        const priceRaw = norm(cells[hIdx['price']    ?? 3]  ?? '');
+        if(!(catLbl||catId) || !item) continue;
+        const num = Number(priceRaw.replace(/[^\d.,-]/g,'').replace(/\./g,'').replace(',', '.'));
+        const price = Number.isFinite(num) ? num : 0;
+        const catKey = catId ? normKey(catId) : normKey(catLbl);
+        rows.push({ categoryId: catId || null, category: catLbl || (catId||''), item, size, price, _key: catKey, _ck: normKey(catLbl) });
+      }
+      menuRows = rows;
+      localStorage.setItem('tnm_menu_csv_cache', JSON.stringify({etag:Date.now(), rows}));
     }
 
-    /********* DB Adapters *********/
+    /* ========== DB Adapters (Local default, Firebase optional) ========== */
     const DB = window.FIREBASE_CONFIG ? FirebaseAdapter() : LocalAdapter();
-
     function LocalAdapter(){
       function _load(){ return JSON.parse(localStorage.getItem(ORDERS_KEY()) || '[]'); }
       function _save(arr){ localStorage.setItem(ORDERS_KEY(), JSON.stringify(arr)); bc?.postMessage({type:'orders-updated'}); }
       return {
         async list(){ return _load(); },
-        async push(order){ const arr=_load(); arr.push(order); _save(arr); toast(`Có đơn mới: ${order.type==='takeaway'?'Mang về':'Bàn '+order.table} · ${order.items.length} món`); ping(); return true; },
+        async push(order){ const arr=_load(); arr.push(order); _save(arr); try{ notifyNewOrder(order); }catch{} return true; },
         async setItemStatus(orderId, itemIdx, status){
           const arr=_load(); const i=arr.findIndex(o=>o.id===orderId); if(i<0) return false;
           arr[i].items[itemIdx].itemStatus=status;
@@ -324,7 +455,6 @@
         async resetToday(){ localStorage.removeItem(ORDERS_KEY()); bc?.postMessage({type:'orders-updated'}); }
       };
     }
-
     function RevenueAdapterLocal(){
       return {
         record(order){
@@ -335,533 +465,522 @@
             orderId: order.id,
             tableOrTakeAway: order.type==='takeaway'?'Mang về':`Bàn ${order.table}`,
             items: order.items.map(i=>({name:i.name,size:i.size,qty:i.qty})),
-            amount,
-            paidAt: fmtISO()
+            amount, paidAt: fmtISO()
           };
           const entries = Object.values(pack.entries);
           pack.summary = { totalOrders: entries.length, totalAmount: entries.reduce((s,e)=>s+(e.amount||0),0) };
           localStorage.setItem(key, JSON.stringify(pack));
         },
-        load(){
-          const key = REVENUE_KEY();
-          return JSON.parse(localStorage.getItem(key) || '{"entries":{},"summary":{"totalOrders":0,"totalAmount":0}}');
-        }
+        load(){ const key = REVENUE_KEY(); return JSON.parse(localStorage.getItem(key) || '{"entries":{},"summary":{"totalOrders":0,"totalAmount":0}}'); }
       };
     }
     const Revenue = RevenueAdapterLocal();
 
-    function FirebaseAdapter(){
-      // delegating to firebaseApi defined below (module script). Fallback to local until ready
-      return {
-        async list(){ return window.firebaseApi?.ready ? window.firebaseApi.listOrders() : LocalAdapter().list(); },
-        async push(order){ if(window.firebaseApi?.ready) return window.firebaseApi.pushOrder(order); return LocalAdapter().push(order); },
-        async setItemStatus(orderId, idx, status){ if(window.firebaseApi?.ready) return window.firebaseApi.setItemStatus(orderId, idx, status); return LocalAdapter().setItemStatus(orderId, idx, status); },
-        async markPaidGroup(group){ if(window.firebaseApi?.ready) return window.firebaseApi.markPaidGroup(group); return LocalAdapter().markPaidGroup(group); },
-        async resetToday(){ if(window.firebaseApi?.ready) return window.firebaseApi.resetToday(); return LocalAdapter().resetToday(); }
+    function FirebaseAdapter(){ return {
+      async list(){ return window.firebaseApi?.ready ? window.firebaseApi.listOrders() : LocalAdapter().list(); },
+      async push(order){ if(window.firebaseApi?.ready) return window.firebaseApi.pushOrder(order); return LocalAdapter().push(order); },
+      async setItemStatus(orderId, idx, status){ if(window.firebaseApi?.ready) return window.firebaseApi.setItemStatus(orderId, idx, status); return LocalAdapter().setItemStatus(orderId, idx, status); },
+      async markPaidGroup(group){ if(window.firebaseApi?.ready) return window.firebaseApi.markPaidGroup(group); return LocalAdapter().markPaidGroup(group); },
+      async resetToday(){ if(window.firebaseApi?.ready) return window.firebaseApi.resetToday(); return LocalAdapter().resetToday(); }
+    } }
+
+    /* ========== CSV Loader + Indexer ========== */
+    async function loadMenuCSV(){
+      const cache = JSON.parse(localStorage.getItem('tnm_menu_csv_cache')||'null');
+      if(cache?.rows?.length && !(IS_FILE || DEV_FORCE)){ menuRows = cache.rows; buildMenuIndex(); return; }
+      if(!IS_FILE && !DEV_FORCE){
+        try{
+          const res = await fetch('assets/menu.csv?ts='+Date.now());
+          if(!res.ok) throw new Error(res.status);
+          const raw = await res.text();
+          await parseCSVTextAndCache(raw); buildMenuIndex(); return;
+        }catch(e){ console.warn('Fetch CSV failed, switch to Dev Mode', e); DEV_FORCE = true; }
       }
+      showDevPanel(true);
+      const cached = JSON.parse(localStorage.getItem('tnm_menu_csv_cache')||'null');
+      if(cached?.rows){ menuRows=cached.rows; buildMenuIndex(); }
+    }
+    function buildMenuIndex(){
+      const idx = {}; const tops = [];
+      for(const r of menuRows){
+        const isTop = (r._key === 'topping' || r._ck === 'topping');
+        if(isTop){ tops.push({ name:r.item, price:r.price }); continue; }
+        if(!idx[r.item]) idx[r.item] = { category: r.category, _key: r._key, sizes: [] };
+        idx[r.item].sizes.push({ size: r.size, price: r.price });
+      }
+      menuIndex = idx; toppings = tops;
     }
 
-    /********* CSV Menu *********/
-		async function loadMenuCSV(){
-		  const cache = JSON.parse(localStorage.getItem('tnm_menu_csv_cache')||'null');
-		  if(cache?.etag){ menuRows = cache.rows; buildMenuIndex(); return; }
+	    /* ========== Renderers ========== */
+function renderRole(){
+  Object.values(els.views).forEach(v=>v.classList.add('hidden'));
+  els.views[role].classList.remove('hidden');
+  els.roleSelect.value = role;
+
+  // CHỈ hiện nút 🛒 trong header khi role = staff
+  const cartBtnHeader = document.getElementById('btnJumpCartHeader');
+  if (cartBtnHeader) cartBtnHeader.classList.toggle('hidden', role !== 'staff');
+}
+		// Hiện nút 🛒 trong header chỉ khi role = staff
+const cartBtnHeader = document.getElementById('btnJumpCartHeader');
+if (cartBtnHeader) {
+  cartBtnHeader.classList.toggle('hidden', role !== 'staff');
+}
+
+	
+	    function renderCart(){
+	      const list = els.cartList;
+	      if(!cart.length){ list.textContent='Chưa có món.'; els.cartTotal.textContent='0₫'; return; }
+	      list.innerHTML = cart.map((it,idx)=>{
+	        const tops = (it.toppings||[]).map(t=>`${t.name}(+${money(t.price)})`).join(', ');
+	        const sum = (it.basePrice + (it.toppings||[]).reduce((s,x)=>s+x.price,0))*it.qty;
+	        return `<div class="py-2 flex items-start gap-2 border-b last:border-0">
+	          <div class="flex-1">
+	            <div class="text-sm font-medium">${it.name} — ${it.size} × ${it.qty}</div>
+	            <div class="text-xs text-gray-500">${tops || (it.note?it.note:'')}</div>
+	          </div>
+	          <div class="text-right">
+	            <div class="text-sm font-semibold">${money(sum)}</div>
+	            <button data-rm="${idx}" class="text-xs text-red-600">Xóa</button>
+	          </div>
+	        </div>`;
+	      }).join('');
+	      list.querySelectorAll('[data-rm]').forEach(b=> b.onclick=()=>{
+	  cart.splice(Number(b.dataset.rm),1);
+	  renderCart();
+	  syncAllCardQty(); // cập nhật số trên các card sau khi xóa
+	});
+	
+	      const total = cart.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty, 0);
+	      els.cartTotal.textContent = money(total);
+		  updateCartTitle();
+		  updateCartButtonBadge();
+
+	    }
+	
+	    async function renderMyOrders(){
+	      const orders = await DB.list();
+	      const mine = orders.filter(o=>o.status!=='paid').slice().reverse();
+	      els.recentOrders.innerHTML = mine.map(o=>{
+	        const delivered = o.items.filter(i=>i.itemStatus==='delivered').length;
+	        const badge = o.type==='takeaway'
+	          ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Mang về</span>`
+	          : `<span class="badge border bg-blue-100 text-blue-700 border-blue-300 px-2 py-0.5 rounded">Bàn ${o.table}</span>`;
+	        return `<div class="flex items-center justify-between border rounded-lg p-3">
+	          <div><p class="font-medium">#${shortId(o.id)}</p><p class="text-xs text-gray-500">${delivered}/${o.items.length} món đã giao</p></div>
+	          <div class="flex items-center gap-2">${badge}</div></div>`;
+	      }).join('') || '<p class="text-sm text-gray-500">—</p>';
+	    }
+	
+	// Đếm tổng số lượng món trong giỏ
+function cartItemCount(){
+  // tính tổng qty của tất cả item trong giỏ
+  return cart.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+}
+
+// Cập nhật hiển thị con số trên nút 🛒 Xem giỏ
+function updateCartButtonBadge(){
+  const n = cartItemCount();
+  const txt = n ? `(${n})` : '';
+
+  const el1 = document.getElementById('cartCount');        // nút trong "Chọn bàn & Menu"
+  if (el1) el1.textContent = txt;
+
+  const el2 = document.getElementById('cartCountHeader');  // nút ở header
+  if (el2) el2.textContent = txt;
+}
+
+
+	
+			function itemSignature(name, size, topsArr, note, basePrice){
+			  const tops = (topsArr||[])
+			    .map(t=>`${norm(t.name).toLowerCase()}|${Number(t.price)||0}`)
+			    .sort()
+			    .join(';');
+			  return [
+			    norm(name).toLowerCase(),
+			    norm(size||''),
+			    tops,
+			    norm((note||'').trim()),
+			    Number(basePrice)||0
+			  ].join('::');
+			}
+	
+			function getCardSelection(card){
+			  const name = card.querySelector('.font-semibold')?.textContent.trim() || '';
+			  const [size, price] = (card.querySelector('.sizeSel')?.value || '').split('|');
+			  const note = (card.querySelector('.noteTxt')?.value || '').trim();
+			  const basePrice = Number(price || 0);
+			  const tops = Array.from(card.querySelectorAll('.topping-cb:checked')).map(cb=>{
+			    const [tn,tp] = cb.dataset.top.split('|');
+			    return { name: tn, price: Number(tp || 0) };
+			  });
+			  return { name, size, note, basePrice, tops };
+			}
+			
+			function syncCardQtyFromCart(card){
+			  const sel = getCardSelection(card);
+			  const sig = itemSignature(sel.name, sel.size, sel.tops, sel.note, sel.basePrice);
+			  const it = cart.find(i => itemSignature(i.name, i.size, i.toppings, i.note, i.basePrice) === sig);
+			  const qtyVal = card.querySelector('.qtyVal');
+			  if (!qtyVal) return;
+			  qtyVal.textContent = it ? String(it.qty) : '1';
+			}
+			
+			function syncAllCardQty(){
+			  Array.from(els.menuGrid.children).forEach(syncCardQtyFromCart);
+			}
+	
+			
+			function resetAllMenuCards(){
+			  Array.from(els.menuGrid.children).forEach(card=>{
+			    const qtyVal = card.querySelector('.qtyVal');
+			    const noteTxt = card.querySelector('.noteTxt');
+			    const sizeSel = card.querySelector('.sizeSel');
+			    const tops    = card.querySelectorAll('.topping-cb');
+			    if(qtyVal) qtyVal.textContent = '1';
+			    if(noteTxt) noteTxt.value = '';
+			    if(sizeSel) sizeSel.selectedIndex = 0;
+			    tops.forEach(cb=> cb.checked = false);
+				delete card.dataset.addedOnce;
+			  });
+			}
+	
+
+    function renderStaff(){
+		// Sắp xếp: Bàn 1 → N rồi mới Mang về
+		const prevSel = els.tableSelect.value; // giữ lại lựa chọn trước (nếu có)
+		els.tableSelect.innerHTML =
+		  Array.from({ length: cfg.tables }, (_, i) => `<option value="${i + 1}">Bàn ${i + 1}</option>`).join('') +
+		  `<option value="takeaway">Mang về</option>`;
 		
-		  const res = await fetch('assets/menu.csv?ts='+Date.now());
-		  const raw = await res.text();
-		  const lines = raw.split(/\r?\n/).filter(l=>norm(l).length>0);
-		  if(!lines.length){ menuRows=[]; buildMenuIndex(); return; }
-		
-		  const head = lines[0];
-		  const DELIM = ((head.match(/;/g)||[]).length > (head.match(/,/g)||[]).length) ? ';' : ',';
-		  const splitCSV = (line, d)=>{
-		    let out=[], cur='', q=false;
-		    for(const ch of line){ if(ch==='\"'){ q=!q; continue; } if(ch===d && !q){ out.push(cur); cur=''; } else cur+=ch; }
-		    out.push(cur); return out;
-		  };
-		
-		  const headers = splitCSV(head, DELIM).map(c=>norm(c));
-		  const hIdx = Object.fromEntries(headers.map((h,i)=>[normKey(h), i]));
-		
-		  const rows=[];
-		  for(let i=1;i<lines.length;i++){
-		    const cells = splitCSV(lines[i], DELIM);
-		    const catId  = norm(cells[hIdx['categoryid'] ?? -1] ?? '');
-		    const catLbl = norm(cells[hIdx['category']   ?? 0]  ?? '');
-		    const item   = norm(cells[hIdx['item']       ?? 1]  ?? '');
-		    const size   = norm(cells[hIdx['size']       ?? 2]  ?? '');
-		    const priceRaw = norm(cells[hIdx['price']    ?? 3]  ?? '');
-		    if(!(catLbl||catId) || !item) continue;
-		
-		    const num = Number(priceRaw.replace(/[^\d.,-]/g,'').replace(/\./g,'').replace(',', '.'));
-		    const price = Number.isFinite(num) ? num : 0;
-		
-		    // catKey ưu tiên CategoryID; không có thì fallback về tên chuẩn hóa
-		    const catKey = catId ? normKey(catId) : normKey(catLbl);
-		
-		    rows.push({
-		      categoryId: catId || null,
-		      category: catLbl || (catId||''),
-		      item, size, price,
-		      _key: catKey,        // khóa lọc chính
-		      _ck: normKey(catLbl) // khóa từ nhãn (để tương thích)
-		    });
-		  }
-		
-		  menuRows = rows;
-		  localStorage.setItem('tnm_menu_csv_cache', JSON.stringify({etag:Date.now(), rows}));
-		  buildMenuIndex();
+		// Nếu lựa chọn trước không còn, mặc định là Bàn 1
+		if ([...els.tableSelect.options].some(o => o.value === prevSel)) {
+		  els.tableSelect.value = prevSel;
+		} else {
+		  els.tableSelect.value = '1';
 		}
-
-		function buildMenuIndex(){
-		  const idx = {};
-		  const tops = [];
-		  for(const r of menuRows){
-		    const isTop = (r._key === 'topping' || r._ck === 'topping'); // ưu tiên CategoryID
-		    if(isTop){ tops.push({ name:r.item, price:r.price }); continue; }
 		
-		    if(!idx[r.item]) idx[r.item] = { category: r.category, _key: r._key, sizes: [] };
-		    idx[r.item].sizes.push({ size: r.size, price: r.price });
-		  }
-		  menuIndex = idx;
-		  toppings = tops;
-		}
+		// Cập nhật tiêu đề giỏ hàng
+		updateCartTitle();
 
 
-    /********* Renderers *********/
-    function renderRole(){
-      Object.values(els.views).forEach(v=>v.classList.add('hidden'));
-      els.views[role].classList.remove('hidden');
-      els.roleSelect.value = role;
-    }
+      const catMap = new Map();
+      for(const r of menuRows){ if(r._key && r._key!=='topping') catMap.set(r._key, r.category); }
+      const prevKey = els.catFilter.dataset.key || '__all__';
+      els.catFilter.innerHTML = `<option value="__all__">Tất cả</option>` + Array.from(catMap.entries()).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+      els.catFilter.value = catMap.has(prevKey) ? prevKey : '__all__';
+      els.catFilter.dataset.key = els.catFilter.value;
 
-		function renderStaff(){
-		  // Bàn/Mang về
-		  els.tableSelect.innerHTML = `<option value="takeaway">Mang về</option>` +
-		    Array.from({length: cfg.tables},(_,i)=>`<option value="${i+1}">Bàn ${i+1}</option>`).join('');
-		  els.cartTitle.textContent = `Giỏ hàng · ${els.tableSelect.value==='takeaway'?'Mang về':'Bàn '+els.tableSelect.value}`;
-		
-		  // Category map: key -> label (bỏ 'topping')
-		  const catMap = new Map();
-		  for(const r of menuRows){
-		    if(r._key && r._key!=='topping') catMap.set(r._key, r.category);
-		  }
-		
-		  const prevKey = els.catFilter.dataset.key || '__all__';
-		  els.catFilter.innerHTML = `<option value="__all__">Tất cả</option>` +
-		    Array.from(catMap.entries()).map(([key,label])=>`<option value="${key}">${label}</option>`).join('');
-		  els.catFilter.value = catMap.has(prevKey) ? prevKey : '__all__';
-		  els.catFilter.dataset.key = els.catFilter.value;
-		
-		  const kw = norm(els.searchInput.value||'').toLowerCase();
-		  const catKey = els.catFilter.value;
-		
-		  const items = Object.entries(menuIndex)
-		    .filter(([name,info])=>{
-		      const byCat = (catKey==='__all__') || (info._key === catKey);
-		      const byKw  = !kw || norm(name).toLowerCase().includes(kw);
-		      return byCat && byKw;
-		    })
-		    .map(([name,info])=>({name, ...info}));
-		
-		  els.menuGrid.innerHTML = items.map(it=>{
-		    const sizeOpts = it.sizes.map(s=>`<option value="${s.size}|${s.price}">${s.size||'Mặc định'} — ${money(s.price)}</option>`).join('');
-		    const topOpts = toppings.length
-		      ? toppings.map(t=>`<label class="flex items-center gap-2 text-xs">
-		          <input type="checkbox" data-top="${t.name}|${t.price}" class="topping-cb">
-		          <span>${t.name} <span class="text-gray-500">+${money(t.price)}</span></span>
-		        </label>`).join('')
-		      : '<p class="text-xs text-gray-400">Chưa có topping</p>';
-		
-		    return `<div class="border rounded-xl p-4 hover:shadow-sm flex flex-col gap-2">
-		      <div class="flex items-start justify-between gap-3">
-		        <div>
-		          <h3 class="font-semibold text-gray-900">${it.name}</h3>
-		          <p class="text-sm text-gray-500">${it.category}</p>
-		        </div>
-		      </div>
-		      <select class="sizeSel w-full border rounded px-2 py-1">${sizeOpts}</select>
-		      <textarea class="noteTxt w-full border rounded px-2 py-1 text-sm" rows="1" placeholder="Ghi chú (tuỳ chọn)"></textarea>
-		      <details class="rounded border p-2">
-		        <summary class="text-xs cursor-pointer">Thêm topping</summary>
-		        <div class="mt-2 grid grid-cols-1 gap-1 max-h-28 overflow-auto">${topOpts}</div>
-		      </details>
-		      <div class="mt-2 flex items-center justify-between">
-		        <div class="flex items-center gap-2">
-		          <button class="qtyDec px-2 py-1 border rounded">-</button>
-		          <span class="qtyVal w-6 text-center">1</span>
-		          <button class="qtyInc px-2 py-1 border rounded">+</button>
-		        </div>
-		        <button class="addBtn px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
-		      </div>
-		    </div>`;
-		  }).join('');
-		
-		  // bind thẻ món
-		  Array.from(els.menuGrid.children).forEach(card=>{
-		    const qtyVal = card.querySelector('.qtyVal');
-		    card.querySelector('.qtyDec').onclick = ()=>{ const n=Math.max(1,(+qtyVal.textContent||1)-1); qtyVal.textContent=n; };
-		    card.querySelector('.qtyInc').onclick = ()=>{ const n=(+qtyVal.textContent||1)+1; qtyVal.textContent=n; };
-		    card.querySelector('.addBtn').onclick = ()=>{
-		      const name = card.querySelector('.font-semibold').textContent.trim();
-		      const [size, price] = (card.querySelector('.sizeSel').value||'').split('|');
-		      const basePrice = Number(price||0);
-		      const qty = Number(qtyVal.textContent)||1;
-		      const note = card.querySelector('.noteTxt').value.trim();
-		      const tops = Array.from(card.querySelectorAll('.topping-cb:checked')).map(cb=>{
-		        const [tn,tp] = cb.dataset.top.split('|'); return { id:newId('tp'), name:tn, price:Number(tp||0) };
-		      });
-		      cart.push({ menuItemId:newId('mi'), name, size, basePrice, qty, toppings:tops, note, itemStatus:'queued' });
-		      renderCart();
-		    };
-		  });
-		
-		  renderCart();
-		  renderMyOrders();
-		}
+      const kw = norm(els.searchInput.value||'').toLowerCase();
+      const catKey = els.catFilter.value;
 
-    function renderCart(){
-      const list = els.cartList;
-      if(!cart.length){ list.textContent='Chưa có món.'; els.cartTotal.textContent='0₫'; return; }
-      list.innerHTML = cart.map((it,idx)=>{
-        const tops = (it.toppings||[]).map(t=>`${t.name}(+${money(t.price)})`).join(', ');
-        const sum = (it.basePrice + (it.toppings||[]).reduce((s,x)=>s+x.price,0))*it.qty;
-        return `<div class="py-2 flex items-start gap-2 border-b last:border-0">
-          <div class="flex-1">
-            <div class="text-sm font-medium">${it.name} — ${it.size} × ${it.qty}</div>
-            <div class="text-xs text-gray-500">${tops || 'Không topping'}${it.note ? ' · '+it.note : ''}</div>
-          </div>
-          <div class="text-right">
-            <div class="text-sm font-semibold">${money(sum)}</div>
-            <button data-rm="${idx}" class="text-xs text-red-600">Xóa</button>
-          </div>
+      const items = Object.entries(menuIndex)
+        .filter(([name,info])=> ((catKey==='__all__') || (info._key === catKey)) && (!kw || norm(name).toLowerCase().includes(kw)))
+        .map(([name,info])=>({name, ...info}));
+
+      els.menuGrid.innerHTML = items.map(it=>{
+        const sizeOpts = it.sizes.map(s=>`<option value="${s.size}|${s.price}">${s.size||'Mặc định'} — ${money(s.price)}</option>`).join('');
+        const topOpts = (toppings.length
+          ? toppings.map(t=>`<label class="flex items-center gap-2 text-xs"><input type="checkbox" data-top="${t.name}|${t.price}" class="topping-cb"><span>${t.name} <span class="text-gray-500">+${money(t.price)}</span></span></label>`).join('')
+          : '<p class="text-xs text-gray-400">Chưa có topping</p>');
+        return `
+		
+		<div class="border rounded-xl p-4 hover:shadow-sm flex flex-col gap-2 h-full">
+  <div class="flex items-start justify-between gap-3"><div><h3 class="font-semibold text-gray-900">${it.name}</h3></div></div>
+  <select class="sizeSel w-full border rounded px-2 py-1">${sizeOpts}</select>
+  <textarea class="noteTxt w-full border rounded px-2 py-1 text-sm" rows="1" placeholder="Ghi chú (tuỳ chọn)"></textarea>
+  <details class="rounded border p-2"><summary class="text-xs cursor-pointer">Thêm topping</summary><div class="mt-2 grid grid-cols-1 gap-1 max-h-28 overflow-auto">${topOpts}</div></details>
+  <div class="mt-auto pt-2 flex items-center justify-between">
+    <div class="flex items-center gap-2"><button class="qtyDec px-2 py-1 border rounded">-</button><span class="qtyVal w-6 text-center">1</span><button class="qtyInc px-2 py-1 border rounded">+</button></div>
+    <button class="addBtn px-3 py-1 rounded-lg bg-black text-white text-sm">Thêm</button>
+  </div>
+</div>
+
         </div>`;
       }).join('');
-      list.querySelectorAll('[data-rm]').forEach(b=> b.onclick=()=>{ cart.splice(Number(b.dataset.rm),1); renderCart(); });
-      const total = cart.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty, 0);
-      els.cartTotal.textContent = money(total);
-      els.cartTitle.textContent = `Giỏ hàng · ${els.tableSelect.value==='takeaway'?'Mang về':'Bàn '+els.tableSelect.value}`;
-    }
 
-    async function submitOrder(){
-      if(!cart.length) return alert('Giỏ hàng trống');
-      const sel = els.tableSelect.value;
-      const order = {
-        id: newId('ord'),
-        type: sel==='takeaway' ? 'takeaway' : 'table',
-        table: sel==='takeaway' ? null : Number(sel),
-        items: JSON.parse(JSON.stringify(cart)),
-        status: 'queued',
-        createdAt: now(),
-        timeline: [{t:'queued', at: now()}]
-      };
-      await DB.push(order);
-      cart = [];
-      renderCart();
-      renderMyOrders();
-      toast('Đã gửi order, chuyển sang “Các đơn của tôi”.');
-      document.getElementById('recentOrders').scrollIntoView({behavior:'smooth',block:'start'});
+      Array.from(els.menuGrid.children).forEach(card=>{
+        const qtyVal = card.querySelector('.qtyVal');
+        card.querySelector('.qtyDec').onclick = ()=>{ const n=Math.max(1,(+qtyVal.textContent||1)-1); qtyVal.textContent=n; };
+        card.querySelector('.qtyInc').onclick = ()=>{ const n=(+qtyVal.textContent||1)+1; qtyVal.textContent=n; };
+		// Đồng bộ số ở card khi đổi cấu hình (size / note / topping)
+		const sizeSel = card.querySelector('.sizeSel');
+		const noteTxt = card.querySelector('.noteTxt');
+		
+		sizeSel?.addEventListener('change', ()=> syncCardQtyFromCart(card));
+		noteTxt?.addEventListener('input',  ()=> syncCardQtyFromCart(card));
+		
+		card.querySelectorAll('.topping-cb').forEach(cb=>{
+		  cb.addEventListener('change', ()=> syncCardQtyFromCart(card));
+		});
+
+card.querySelector('.addBtn').onclick = ()=>{
+  // Lấy cấu hình hiện tại của card
+  const name    = card.querySelector('.font-semibold').textContent.trim();
+  const [size, price] = (card.querySelector('.sizeSel').value||'').split('|');
+  const basePrice = Number(price||0);
+
+  const qtyEl   = card.querySelector('.qtyVal');
+  const noteEl  = card.querySelector('.noteTxt');
+  const qty     = Math.max(1, Number(qtyEl.textContent)||1); // nếu chưa bấm +/- thì = 1
+  const note    = (noteEl.value||'').trim();
+
+  const topCbs  = card.querySelectorAll('.topping-cb:checked');
+  const tops = Array.from(topCbs).map(cb=>{
+    const [tn,tp] = cb.dataset.top.split('|');
+    return { id:newId('tp'), name:tn, price:Number(tp||0) };
+  });
+
+  // Gộp theo chữ ký
+  const sig = itemSignature(name, size, tops, note, basePrice);
+  const found = cart.find(it => itemSignature(it.name, it.size, it.toppings, it.note, it.basePrice) === sig);
+  if(found){ found.qty += qty; }
+  else { 
+    cart.push({ 
+      menuItemId:newId('mi'), 
+      name, size, basePrice, qty, toppings:tops, note, itemStatus:'queued' 
+    }); 
+  }
+
+  // Cập nhật giỏ
+  renderCart();
+
+  // ==== YÊU CẦU MỚI ====
+  // 1️⃣ Reset số về 1 để lần sau chỉ cộng +1 (trừ khi bạn tự tăng giảm trước)
+  qtyEl.textContent = '1';
+  // 2️⃣ Xóa ghi chú
+  noteEl.value = '';
+  // 3️⃣ Bỏ chọn toàn bộ topping
+  card.querySelectorAll('.topping-cb').forEach(cb => cb.checked = false);
+  // 4️⃣ Đóng phần "Thêm topping"
+  const detailsEl = card.querySelector('details');
+  if (detailsEl && detailsEl.open) detailsEl.open = false;
+  // (Không reset size)
+};
+
+
+		});
+
+      renderCart(); renderMyOrders();
     }
 
     async function loadOrders(){ return await DB.list(); }
 
-    async function renderMyOrders(){
-      const orders = await loadOrders();
-      const mine = orders.filter(o=>o.status!=='paid').slice().reverse();
-      els.recentOrders.innerHTML = mine.map(o=>{
-        const delivered = o.items.filter(i=>i.itemStatus==='delivered').length;
-        const badge = o.type==='takeaway'
-          ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Mang về</span>`
-          : `<span class="badge border bg-blue-100 text-blue-700 border-blue-300 px-2 py-0.5 rounded">Bàn ${o.table}</span>`;
-        return `<div class="flex items-center justify-between border rounded-lg p-3">
-          <div>
-            <p class="font-medium">#${shortId(o.id)}</p>
-            <p class="text-xs text-gray-500">${delivered}/${o.items.length} món đã giao</p>
-          </div>
-          <div class="flex items-center gap-2">${badge}</div>
-        </div>`;
-      }).join('') || '<p class="text-sm text-gray-500">—</p>';
-    }
+    // ===== Barista (v2.2) =====
+    async function renderBarista(){
+      els.tabByTable.classList.toggle('bg-black', baristaTab==='table');
+      els.tabByTable.classList.toggle('text-white', baristaTab==='table');
+      els.tabByItem.classList.toggle('bg-black', baristaTab==='item');
+      els.tabByItem.classList.toggle('text-white', baristaTab==='item');
 
-    function groupByKey(orders){
-      const m=new Map();
-      orders.forEach(o=>{
-        const k = o.type==='takeaway' ? 'takeaway' : `table-${o.table}`;
-        const arr = m.get(k)||[]; arr.push(o); m.set(k, arr);
-      });
-      for(const v of m.values()){ v.sort((a,b)=>a.createdAt-b.createdAt); v.forEach((o,i)=>o.__supp=i>0); }
-      return m;
-    }
+      const ordersAll = await loadOrders();
+      const active = ordersAll.filter(o => o.status !== 'paid');
 
-// ===== Barista UI: giống ảnh demo, có số thứ tự + nhãn Bổ sung =====
-async function renderBarista(){
-  // toggle tab style
-  els.tabByTable.classList.toggle('bg-black', baristaTab==='table');
-  els.tabByTable.classList.toggle('text-white', baristaTab==='table');
-  els.tabByItem.classList.toggle('bg-black', baristaTab==='item');
-  els.tabByItem.classList.toggle('text-white', baristaTab==='item');
+      const queueOrders = active.filter(o => o.items.some(it => it.itemStatus !== 'delivered'));
+      const deliveredOrders = active.filter(o => o.items.every(it => it.itemStatus === 'delivered'));
 
-  const ordersAll = await loadOrders();
-  const active = ordersAll.filter(o => o.status !== 'paid');
+      const queueSorted = queueOrders.slice().sort((a,b)=> a.createdAt - b.createdAt);
+      const qpos = new Map(queueSorted.map((o,i)=> [o.id, i+1]));
 
-  // Tính thứ tự hàng đợi theo thời gian tạo (tăng dần)
-  const queueSorted = active.slice().sort((a,b)=> a.createdAt - b.createdAt);
-  const qpos = new Map(queueSorted.map((o,i)=> [o.id, i+1])); // id -> số thứ tự
+      // BY TABLE (queue)
+      const baristaWrap = els.baristaByTable;
+      baristaWrap.innerHTML = '';
+      if(!queueOrders.length){
+        baristaWrap.innerHTML = '<p class="text-sm text-gray-500">Không có đơn chờ pha chế.</p>';
+      }else{
+        const grouped = new Map();
+        queueOrders.forEach(o=>{ const k = o.type==='takeaway' ? 'takeaway' : `table-${o.table}`; const arr = grouped.get(k)||[]; arr.push(o); grouped.set(k,arr); });
+        for(const [,arr] of grouped){ arr.sort((a,b)=> a.createdAt-b.createdAt); arr.forEach((o,i)=> o.__supp = i>0); }
 
-  // Nhóm theo bàn / mang về + gắn "Bổ sung"
-  const grouped = new Map();
-  active.forEach(o=>{
-    const k = o.type==='takeaway' ? 'takeaway' : `table-${o.table}`;
-    const arr = grouped.get(k) || [];
-    arr.push(o); grouped.set(k, arr);
-  });
-  for(const [,arr] of grouped){
-    arr.sort((a,b)=> a.createdAt - b.createdAt);
-    arr.forEach((o,i)=> o.__supp = i>0); // true nếu là đơn bổ sung
-  }
+        const entries = Array.from(grouped.entries()).sort((a,b)=>{
+          if(a[0]==='takeaway') return -1; if(b[0]==='takeaway') return 1;
+          return Number(a[0].split('-')[1]) - Number(b[0].split('-')[1]);
+        });
 
-  // ===== BY TABLE =====
-  const host = els.baristaByTable;
-  host.innerHTML = '';
-  if(grouped.size===0){
-    host.innerHTML = '<p class="text-sm text-gray-500">Không có đơn.</p>';
-  } else {
-    // sắp xếp theo số bàn tăng dần, Mang về đứng trước
-    const entries = Array.from(grouped.entries()).sort((a,b)=>{
-      if(a[0]==='takeaway') return -1;
-      if(b[0]==='takeaway') return 1;
-      return Number(a[0].split('-')[1]) - Number(b[0].split('-')[1]);
-    });
-
-    entries.forEach(([key, orders])=>{
-      const title = key==='takeaway' ? 'Mang về' : `Bàn ${key.split('-')[1]}`;
-      const badgeRight = `<span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${orders.length} đơn</span>`;
-      const priBadge = key==='takeaway'
-        ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Ưu tiên</span>`
-        : '';
-
-      const col = document.createElement('div');
-      col.className = 'border rounded-xl p-4';
-      col.innerHTML = `
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="font-semibold">${title}</h3>
-          <div class="flex items-center gap-2">${priBadge}${badgeRight}</div>
-        </div>
-        <div class="space-y-3"></div>
-      `;
-
-      const list = col.querySelector('.space-y-3');
-      orders.forEach(o=>{
-        // danh sách món (theo item-level)
-        const itemsHtml = o.items.map((it,idx)=>{
-          const tops = (it.toppings||[]).map(t=>t.name).join(', ');
-          const statusTxt = it.itemStatus==='delivered' ? 'Đã giao' : 'Chờ pha';
-          const statusCls = it.itemStatus==='delivered' ? 'text-emerald-700' : 'text-gray-500';
-          return `
-            <li class="list-disc list-inside">
-              ${it.name} × ${it.qty}
-              <div class="text-xs text-gray-500 ml-5">${tops||'Không topping'}${it.note ? ' · '+it.note : ''}</div>
-              <div class="mt-1 ml-5 flex items-center justify-between">
-                <span class="text-xs ${statusCls}">${statusTxt}</span>
-                <button data-deliver="${o.id}|${idx}" class="text-xs px-3 py-1 rounded bg-emerald-600 text-white ${it.itemStatus==='delivered'?'opacity-40 pointer-events-none':''}">
-                  Đã giao
-                </button>
-              </div>
-            </li>`;
-        }).join('');
-
-        list.innerHTML += `
-          <div class="rounded-lg border p-3">
-            <div class="flex items-center justify-between">
+        entries.forEach(([key, orders])=>{
+          const title = key==='takeaway' ? 'Mang về' : `Bàn ${key.split('-')[1]}`;
+          const priBadge = key==='takeaway' ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Ưu tiên</span>` : '';
+          const col = document.createElement('div');
+          col.className='border rounded-xl p-4';
+          col.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold">${title}</h3>
               <div class="flex items-center gap-2">
-                <span class="w-7 h-7 rounded-full bg-black text-white text-xs grid place-items-center font-semibold">
-                  ${qpos.get(o.id) || ''}
-                </span>
-                <p class="text-sm text-gray-700">
-                  #${o.id ? o.id.slice(-4) : ''} · ${o.__supp ? 'Bổ sung' : 'Đơn đầu'} · ${fmtTime(o.createdAt)}
+                ${priBadge}
+                <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">${orders.length} đơn</span>
+              </div>
+            </div>
+            <div class="space-y-3"></div>`;
+          const list = col.querySelector('.space-y-3');
+
+          orders.forEach(o=>{
+            const itemsHtml = o.items.map((it,idx)=>{
+              const tops = (it.toppings||[]);
+              const topsLine = tops.length
+                ? `<div class="text-xs text-gray-500 ml-5">${tops.map(t=>t.name).join(', ')}${it.note ? ' · '+it.note : ''}</div>`
+                : (it.note ? `<div class="text-xs text-gray-500 ml-5">${it.note}</div>` : '');
+              const delivered = it.itemStatus==='delivered';
+              return `<li class="list-disc list-inside">
+                  ${it.name} × ${it.qty}
+                  ${topsLine}
+                  ${delivered ? `<div class="mt-1 ml-5 text-xs text-emerald-700">Đã giao</div>` : ``}
+                  <div class="mt-1 ml-5 flex items-center justify-end">
+                    <button data-deliver="${o.id}|${idx}" class="text-xs px-3 py-1 rounded ${delivered?'bg-emerald-200 text-emerald-800 pointer-events-none':'bg-emerald-600 text-white'}">
+                      Đã giao
+                    </button>
+                  </div>
+                </li>`;
+            }).join('');
+
+            list.innerHTML += `
+              <div class="rounded-lg border p-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="w-7 h-7 rounded-full bg-black text-white text-xs grid place-items-center font-semibold">${qpos.get(o.id)||''}</span>
+                    <p class="text-sm text-gray-700">#${shortId(o.id)} · ${o.__supp ? 'Bổ sung' : 'Đơn đầu'} · ${fmtTime(o.createdAt)}</p>
+                  </div>
+                </div>
+                <ul class="mt-2 text-sm">${itemsHtml}</ul>
+                <div class="mt-3"><button data-deliver-all="${o.id}" class="px-3 py-1 rounded-lg border">Giao hết</button></div>
+              </div>`;
+          });
+
+          baristaWrap.appendChild(col);
+        });
+
+        baristaWrap.querySelectorAll('[data-deliver]').forEach(btn=> btn.onclick = async ()=>{
+          const [oid, idx] = btn.dataset.deliver.split('|');
+          await DB.setItemStatus(oid, Number(idx), 'delivered');
+          refreshAll();
+        });
+        baristaWrap.querySelectorAll('[data-deliver-all]').forEach(btn=> btn.onclick = async ()=>{
+          const oid = btn.dataset.deliverAll;
+          const orders = await loadOrders(); const o = orders.find(x=>x.id===oid); if(!o) return;
+          for(let i=0;i<o.items.length;i++){ if(o.items[i].itemStatus!=='delivered') await DB.setItemStatus(oid,i,'delivered'); }
+          refreshAll();
+        });
+      }
+
+      // BY ITEM (queue)
+      const byItemHost = els.baristaByItem;
+      const occurrences = [];
+      queueOrders.forEach(o=> o.items.forEach((it,idx)=> occurrences.push({order:o, idx, name:it.name, qty:it.qty})));
+      occurrences.sort((a,b)=> a.order.createdAt - b.order.createdAt);
+      const groups = new Map();
+      occurrences.forEach(r=>{ const g = groups.get(r.name) || { total:0, rows:[] }; g.total += r.qty; g.rows.push(r); groups.set(r.name, g); });
+      byItemHost.innerHTML = Array.from(groups.entries()).map(([name,g])=>{
+        const rows = g.rows.map(r=>`
+            <div class="flex items-center justify-between text-sm">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-black text-white grid place-items-center text-[10px]">${qpos.get(r.order.id)||''}</span>
+                <span>${r.order.type==='takeaway' ? 'Mang về' : `Bàn ${r.order.table}`} · #${shortId(r.order.id)} ${r.order.__supp?'· Bổ sung':''} · ${fmtTime(r.order.createdAt)} · ×${r.qty}</span>
+              </div>
+            </div>`).join('');
+        return `<div class="border rounded-xl p-4"><div class="flex items-center justify-between mb-2"><h4 class="font-semibold">${name}</h4><span class="text-sm font-bold">${g.total}</span></div><div class="space-y-1">${rows}</div></div>`;
+      }).join('') || '<p class="text-sm text-gray-500">Không có món.</p>';
+
+      // DELIVERED · CHỜ THANH TOÁN
+      const toPayHost = document.getElementById('baristaToPay');
+      if (toPayHost) {
+        const mapPay = new Map();
+        deliveredOrders.forEach(o => {
+          const k = o.type === 'takeaway' ? 'takeaway' : `table-${o.table}`;
+          const arr = mapPay.get(k) || [];
+          arr.push(o); mapPay.set(k, arr);
+        });
+
+        toPayHost.innerHTML = '';
+        if (!mapPay.size) {
+          toPayHost.innerHTML = '<p class="text-sm text-gray-500">Không có đơn chờ thanh toán.</p>';
+        } else {
+          for (const [key, arr] of mapPay) {
+            const type = key === 'takeaway' ? 'takeaway' : 'table';
+            const title = key === 'takeaway' ? 'Mang về' : `Bàn ${key.split('-')[1]}`;
+            const amount = arr.reduce((s, o) =>
+              s + o.items.reduce((s2, it) =>
+                s2 + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0)) * it.qty, 0), 0);
+
+            const wrap = document.createElement('div');
+            wrap.className = 'border rounded-lg p-3 flex items-center justify-between';
+            wrap.innerHTML = `
+              <div>
+                <p class="font-semibold">${title} · ${arr.length} đơn</p>
+                <p class="text-xs text-gray-500">
+                  ${arr.map(o => `#${shortId(o.id)} (${fmtTime(o.createdAt)})`).join(' · ')}
                 </p>
               </div>
-              <span class="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">Chờ pha</span>
-            </div>
-            <ul class="mt-2 text-sm">
-              ${itemsHtml}
-            </ul>
-            <div class="mt-3">
-              <button data-deliver-all="${o.id}" class="px-3 py-1 rounded-lg border">Giao hết</button>
-            </div>
-          </div>`;
-      });
-
-      host.appendChild(col);
-    });
-  }
-
-  // gắn sự kiện one-click cho từng món / giao hết
-  host.querySelectorAll('[data-deliver]').forEach(btn=>{
-    btn.onclick = async ()=>{
-      const [oid, idx] = btn.dataset.deliver.split('|');
-      await DB.setItemStatus(oid, Number(idx), 'delivered');
-      refreshAll();
-    };
-  });
-  host.querySelectorAll('[data-deliver-all]').forEach(btn=>{
-    btn.onclick = async ()=>{
-      const oid = btn.dataset.deliverAll;
-      const orders = await loadOrders();
-      const o = orders.find(x=>x.id===oid); if(!o) return;
-      for(let i=0;i<o.items.length;i++){
-        if(o.items[i].itemStatus !== 'delivered'){
-          await DB.setItemStatus(oid, i, 'delivered');
+              <div class="flex items-center gap-3">
+                <span class="font-bold">${money(amount)}</span>
+                <button data-b-pay="${type}|${title.includes('Bàn')?Number(title.replace('Bàn ','')):''}"
+                        class="px-3 py-1 rounded-lg bg-emerald-600 text-white">
+                  Thanh toán ${title}
+                </button>
+              </div>`;
+            toPayHost.appendChild(wrap);
+          }
         }
+
+        toPayHost.onclick = (e) => {
+          const btn = e.target.closest('[data-b-pay]');
+          if (!btn) return;
+          const [type, tableStr] = btn.dataset.bPay.split('|');
+          openPayGroup({ type, table: tableStr ? Number(tableStr) : null });
+        };
       }
-      refreshAll();
-    };
-  });
 
-  // ===== BY ITEM (tổng món) =====
-  const byItemHost = els.baristaByItem;
-  const occurrences = [];
-  active.forEach(o=>{
-    o.items.forEach((it,idx)=>{
-      occurrences.push({
-        order:o, idx,
-        name:it.name, qty:it.qty,
-        status: it.itemStatus,
-      });
-    });
-  });
-  // theo thời gian + gom nhóm hiển thị như ảnh
-  occurrences.sort((a,b)=> a.order.createdAt - b.order.createdAt);
-
-  // gộp theo tên món để vẽ box
-  const groups = new Map();
-  occurrences.forEach(r=>{
-    const g = groups.get(r.name) || { total:0, rows:[] };
-    g.total += r.qty;
-    g.rows.push(r);
-    groups.set(r.name, g);
-  });
-
-  byItemHost.innerHTML = Array.from(groups.entries()).map(([name,g])=>{
-    const rows = g.rows.map(r=>{
-      const badge = r.order.type==='takeaway'
-        ? `<span class="badge border bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded">Mang về</span>`
-        : `<span class="badge border bg-blue-100 text-blue-700 border-blue-300 px-2 py-0.5 rounded">Bàn ${r.order.table}</span>`;
-      return `
-        <div class="flex items-center justify-between text-sm">
-          <div class="flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-black text-white grid place-items-center text-[10px]">
-              ${qpos.get(r.order.id) || ''}
-            </span>
-            <span>
-              ${r.order.type==='takeaway' ? 'Mang về' : `Bàn ${r.order.table}`} · #${r.order.id.slice(-4)} ${r.order.__supp?'· Bổ sung':''} · ${fmtTime(r.order.createdAt)} · ×${r.qty}
-            </span>
-          </div>
-          ${badge}
-        </div>`;
-    }).join('');
-
-    return `
-      <div class="border rounded-xl p-4">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="font-semibold">${name}</h4>
-          <span class="text-sm font-bold">${g.total}</span>
-        </div>
-        <div class="space-y-1">${rows}</div>
-      </div>`;
-  }).join('') || '<p class="text-sm text-gray-500">Không có món.</p>';
-
-  // toggle 2 tab
-  els.baristaByTable.classList.toggle('hidden', baristaTab!=='table');
-  els.baristaByItem.classList.toggle('hidden',  baristaTab!=='item');
-}
-
+      els.baristaByTable.classList.toggle('hidden', baristaTab!=='table');
+      els.baristaByItem.classList.toggle('hidden',  baristaTab!=='item');
+    }
 
     let cashierBound=false;
     async function renderCashier(){
       const orders = await loadOrders();
-      const queuedOrPart = orders.filter(o=>o.status==='queued');
       const delivered = orders.filter(o=>o.status==='delivered');
       const paid = orders.filter(o=>o.status==='paid');
 
-      // chờ thanh toán: nhóm theo bàn/takeaway
-      const map = groupByKey(delivered);
+      const map = new Map();
+      delivered.forEach(o=>{ const k=o.type==='takeaway'?'takeaway':`table-${o.table}`; const arr=map.get(k)||[]; arr.push(o); map.set(k,arr); });
       els.cashierNotPaid.innerHTML = '';
       for(const [key, arr] of map){
         const type = key==='takeaway'?'takeaway':'table';
         const title = key==='takeaway'?'Mang về':`Bàn ${key.split('-')[1]}`;
-        const amount = arr.reduce((s,o)=> s + o.items.reduce((s2,it)=> s2+(it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty,0), 0);
+        const amount = arr.reduce((s,o)=> s+o.items.reduce((s2,it)=> s2+(it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty,0), 0);
         const wrap = document.createElement('div');
         wrap.className='border rounded-lg p-3 flex items-center justify-between';
-        wrap.innerHTML = `<div>
-          <p class="font-semibold">${title} · ${arr.length} đơn</p>
-          <p class="text-xs text-gray-500">${arr.map(o=>`#${shortId(o.id)} (${fmtTime(o.createdAt)})`).join(' · ')}</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="font-bold">${money(amount)}</span>
-          <button data-pay="${type}|${title.includes('Bàn')?Number(title.replace('Bàn ','')):''}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán ${title}</button>
-        </div>`;
+        wrap.innerHTML = `<div><p class="font-semibold">${title} · ${arr.length} đơn</p><p class="text-xs text-gray-500">${arr.map(o=>`#${shortId(o.id)} (${fmtTime(o.createdAt)})`).join(' · ')}</p></div><div class="flex items-center gap-3"><span class="font-bold">${money(amount)}</span><button data-pay="${type}|${title.includes('Bàn')?Number(title.replace('Bàn ','')):''}" class="px-3 py-1 rounded-lg bg-emerald-600 text-white">Thanh toán ${title}</button></div>`;
         els.cashierNotPaid.appendChild(wrap);
       }
       if(!map.size) els.cashierNotPaid.innerHTML = '<p class="text-sm text-gray-500">Không có đơn.</p>';
 
       if(!cashierBound){
-        els.cashierNotPaid.addEventListener('click',(e)=>{
-          const btn=e.target.closest('[data-pay]'); if(!btn) return;
-          const [type,tableStr]=btn.dataset.pay.split('|');
-          openPayGroup({type, table: tableStr?Number(tableStr):null});
-        });
+        els.cashierNotPaid.addEventListener('click',(e)=>{ const btn=e.target.closest('[data-pay]'); if(!btn) return; const [type,tableStr]=btn.dataset.pay.split('|'); openPayGroup({type, table: tableStr?Number(tableStr):null}); });
         cashierBound=true;
       }
 
-      // bảng doanh thu + KPI
-      loadRevenueUI();
-
-      // ô “đang pha chế” chỉ để tham chiếu KPI tổng đơn
-      els.kpiOrders.textContent = String(orders.length);
-    }
-
-    function loadRevenueUI(){
       const pack = Revenue.load();
       const entries = Object.values(pack.entries||{}).sort((a,b)=> a.paidAt.localeCompare(b.paidAt));
       els.revenueTable.innerHTML = entries.map(e=>{
         const itemCount = e.items.reduce((s,x)=>s+(x.qty||1),0);
-        return `<tr>
-          <td class="p-1">${e.paidAt}</td>
-          <td class="p-1">${e.tableOrTakeAway}</td>
-          <td class="p-1">#${shortId(e.orderId)}</td>
-          <td class="p-1 text-right">${itemCount}</td>
-          <td class="p-1 text-right">${money(e.amount)}</td>
-          <td class="p-1"></td>
-        </tr>`;
+        return `<tr><td class="p-1">${e.paidAt}</td><td class="p-1">${e.tableOrTakeAway}</td><td class="p-1">#${shortId(e.orderId)}</td><td class="p-1 text-right">${itemCount}</td><td class="p-1 text-right">${money(e.amount)}</td><td class="p-1"></td></tr>`;
       }).join('');
       els.cashierTotalToday.textContent = `Tổng: ${money(pack.summary?.totalAmount||0)}`;
 
-      // admin KPIs
       const bytes = new Blob([JSON.stringify(localStorage)]).size;
       els.kpiStorage.textContent = (bytes/1024).toFixed(1)+' KB';
-      els.kpiOnline.textContent = '—'; // sẽ cập nhật từ Firebase presence nếu có
+      els.kpiOnline.textContent = window.FIREBASE_CONFIG ? '≈ realtime' : '—';
       els.kpiBandwidth.textContent = window.FIREBASE_CONFIG ? 'Cloud sync' : 'Local only';
+
+      els.kpiOrders.textContent = String(orders.length);
     }
 
     function openPayGroup(group){
       viewingGroup = group;
       DB.list().then(orders=>{
-        const list = orders.filter(o=> o.status==='delivered' && ((group.type==='takeaway' && o.type==='takeaway') || (group.type==='table' && o.type==='table' && o.table===group.table)))
-                        .sort((a,b)=>a.createdAt-b.createdAt);
+        const list = orders.filter(o=> o.status==='delivered' && ((group.type==='takeaway' && o.type==='takeaway') || (group.type==='table' && o.type==='table' && o.table===group.table))).sort((a,b)=>a.createdAt-b.createdAt);
         if(!list.length){ alert('Không có đơn để thanh toán.'); return; }
         els.payTitle.textContent = `Thanh toán · ${group.type==='takeaway'?'Mang về':'Bàn '+group.table} (${list.length} đơn)`;
-        els.payLines.innerHTML = list.map(o=>`
-          <div class="border rounded-lg p-2">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">#${shortId(o.id)} · ${fmtTime(o.createdAt)}</span>
-            </div>
-            <div class="mt-1 space-y-1 text-sm">
-              ${o.items.map(it=>{
-                const sub = (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty;
-                return `<div class="flex items-center justify-between"><span>${it.name} — ${it.size} × ${it.qty}</span><span class="font-medium">${money(sub)}</span></div>`;
-              }).join('')}
-            </div>
-          </div>`).join('');
+        els.payLines.innerHTML = list.map(o=>`<div class="border rounded-lg p-2"><div class="flex items-center justify-between"><span class="text-sm text-gray-600">#${shortId(o.id)} · ${fmtTime(o.createdAt)}</span></div><div class="mt-1 space-y-1 text-sm">${o.items.map(it=>{const sub=(it.basePrice+(it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty; return `<div class="flex items-center justify-between"><span>${it.name} — ${it.size} × ${it.qty}</span><span class="font-medium">${money(sub)}</span></div>`}).join('')}</div></div>`).join('');
         const total = list.reduce((s,o)=> s + o.items.reduce((s2,it)=> s2+(it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty,0), 0);
         els.payTotal.textContent = money(total);
         els.payModal.classList.remove('hidden'); els.payModal.classList.add('flex');
@@ -869,12 +988,7 @@ async function renderBarista(){
       });
     }
     function closePay(){ viewingGroup=null; els.payModal.classList.add('hidden'); els.payModal.classList.remove('flex'); els.payModal.querySelector('.modal-enter')?.classList.remove('modal-enter-active'); }
-
-    async function confirmPay(){
-      if(!viewingGroup) return;
-      await DB.markPaidGroup(viewingGroup);
-      closePay(); refreshAll(); toast('Đã ghi nhận thanh toán.');
-    }
+    async function confirmPay(){ if(!viewingGroup) return; await DB.markPaidGroup(viewingGroup); closePay(); refreshAll(); }
 
     function downloadRevenueCSV(){
       const pack = Revenue.load();
@@ -889,59 +1003,169 @@ async function renderBarista(){
       const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
       const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`revenue_${new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).replaceAll('-','')}.csv`; a.click();
     }
+function scrollToCart(){
+  document.getElementById('cartSection')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function scrollToMenuTop(){
+  document.getElementById('menuTop')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
 
-    /********* Events + Boot *********/
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('btnJumpCart')?.addEventListener('click', scrollToCart);
+  document.getElementById('btnJumpTop')?.addEventListener('click', scrollToMenuTop);
+});
+document.getElementById('btnJumpCartHeader')?.addEventListener('click', scrollToCart);
+
+
+    /* ========== Events + Boot ========== */
     function setRole(r){ role=r; sessionStorage.setItem('tn_role', r); refreshAll(); }
     els.roleSelect.addEventListener('change', e=>setRole(e.target.value));
-    els.btnResetData.addEventListener('click', async ()=>{
-      if(confirm('Xoá toàn bộ đơn hôm nay?')){ await DB.resetToday(); bc?.postMessage({type:'revenue-updated'}); refreshAll(); }
-    });
-    els.catFilter.addEventListener('change', renderStaff);
-    els.searchInput.addEventListener('input', renderStaff);
-    document.querySelectorAll('.qf').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    const label = norm(btn.textContent);
-    const opt = Array.from(els.catFilter.options).find(o=>norm(o.textContent)===label);
-    els.catFilter.value = opt ? opt.value : '__all__';   // value = CategoryID
-    els.catFilter.dataset.key = els.catFilter.value;
+    els.btnResetData.addEventListener('click', async ()=>{ if(confirm('Xoá toàn bộ đơn hôm nay?')){ await DB.resetToday(); bc?.postMessage({type:'revenue-updated'}); refreshAll(); }});
+    // ========== Clear Search Button ==========
+const clearBtn = document.getElementById('clearSearchBtn');
+els.searchInput.addEventListener('input', ()=>{
+  // Hiện nút ❌ khi có text
+  clearBtn.classList.toggle('hidden', !els.searchInput.value.trim());
+  renderStaff();
+});
+
+clearBtn.addEventListener('click', ()=>{
+  els.searchInput.value = '';
+  clearBtn.classList.add('hidden');
+  renderStaff();
+});
+
+// Khi bấm đổi phân loại hoặc quick filter thì xoá tìm kiếm
+els.catFilter.addEventListener('change', ()=>{
+  els.catFilter.dataset.key = els.catFilter.value || '__all__';
+
+  // clear tìm kiếm khi đổi category
+  els.searchInput.value = '';
+  document.getElementById('clearSearchBtn')?.classList.add('hidden');
+
+  // style cam cho category
+  const on = ['border-orange-400','text-orange-700','bg-orange-50','focus:ring-2','focus:ring-orange-300'];
+  const off= ['border-gray-300','text-gray-700','bg-white','focus:ring-0'];
+  els.catFilter.classList.remove(...on,...off);
+  els.catFilter.classList.add(...on);
+
+  renderStaff();
+  updateQuickFiltersUI();
+  tintDropdowns();
+});
+
+
+document.querySelectorAll('.qf').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    // reset tìm kiếm trước
+    els.searchInput.value = '';
+    document.getElementById('clearSearchBtn')?.classList.add('hidden');
+
+    const label = norm(b.textContent);
+    const labelKey = normKey(label);
+
+    // === QUICK FILTER: Món mới ===
+    // Ưu tiên map vào Category nếu có option tên "Món mới".
+    // Nếu CSV không có category này, fallback: lọc theo từ khóa "mới" hoặc "new".
+    if (labelKey.includes('mới') || labelKey.includes('mon moi') || labelKey.includes('new')) {
+      const optNew = Array.from(els.catFilter.options)
+        .find(o => normKey(o.textContent).includes('mới') || normKey(o.textContent).includes('new'));
+      if (optNew) {
+        els.catFilter.value = optNew.value;
+        els.catFilter.dataset.key = els.catFilter.value;
+      } else {
+        // fallback: để category = tất cả và tìm theo từ khóa
+        els.catFilter.value = '__all__';
+        els.catFilter.dataset.key = '__all__';
+        els.searchInput.value = 'mới';
+      }
+    } else {
+      // các quick filter thường: map vào category theo label
+      const opt = Array.from(els.catFilter.options).find(o=>norm(o.textContent)===label);
+      els.catFilter.value = opt ? opt.value : '__all__';
+      els.catFilter.dataset.key = els.catFilter.value;
+    }
+
     renderStaff();
+    updateQuickFiltersUI();
+    tintDropdowns();
   });
 });
 
-    els.tableSelect.addEventListener('change', ()=>{ els.cartTitle.textContent = `Giỏ hàng · ${els.tableSelect.value==='takeaway'?'Mang về':'Bàn '+els.tableSelect.value}`; });
-    els.btnSubmitOrder.addEventListener('click', submitOrder);
+
+    els.tableSelect.addEventListener('change', ()=>{ updateCartTitle(); tintDropdowns();updateCartButtonBadge();  });
+	els.btnSubmitOrder.addEventListener('click', async ()=>{
+	  if(!cart.length) return alert('Giỏ hàng trống');
+	  const sel = els.tableSelect.value;
+	  const order = {
+	    id:newId('ord'),
+	    type: sel==='takeaway'?'takeaway':'table',
+	    table: sel==='takeaway'?null:Number(sel),
+	    items: JSON.parse(JSON.stringify(cart)),
+	    status:'queued',
+	    createdAt: now(),
+	    timeline:[{t:'queued', at: now()}]
+	  };
+	  await DB.push(order);
+	  cart = [];
+	  renderCart();
+	  renderMyOrders();
+	
+	  // Reset toàn bộ card menu về mặc định
+	  resetAllMenuCards();
+	
+	});
+
     els.tabByTable.addEventListener('click', ()=>{ baristaTab='table'; renderBarista(); });
     els.tabByItem.addEventListener('click', ()=>{ baristaTab='item'; renderBarista(); });
     [els.btnClosePay, els.btnCancelPay].forEach(b=>b.addEventListener('click', closePay));
     els.btnConfirmPay.addEventListener('click', confirmPay);
-    els.btnSaveAdmin.addEventListener('click', ()=>{
-      const newTables = Math.max(1, Number(els.tablesInput.value)||cfg.tables);
-      cfg.tables = newTables; saveCfg(); refreshAll(); toast('Đã lưu cấu hình.');
-    });
+    els.btnSaveAdmin.addEventListener('click', ()=>{ const newTables = Math.max(1, Number(els.tablesInput.value)||cfg.tables); cfg.tables = newTables; saveCfg(); refreshAll(); });
     els.dlRevenueBtn.addEventListener('click', downloadRevenueCSV);
+
+    // Dev Panel events
+    (()=>{
+      const pickBtn = document.getElementById('btnPickCSV');
+      const picker  = document.getElementById('csvPicker');
+      const seedBtn = document.getElementById('btnSeedSample');
+      const hideBtn = document.getElementById('btnHideDev');
+      if(pickBtn && picker){ pickBtn.addEventListener('click', ()=> picker.click()); picker.addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(!f) return; await importCSVFromFile(f); showDevPanel(false); }); }
+      if(seedBtn){ seedBtn.addEventListener('click', async ()=>{ await seedSampleOrders(); refreshAll(); }); }
+      if(hideBtn){ hideBtn.addEventListener('click', ()=> showDevPanel(false)); }
+    })();
+
+    async function seedSampleOrders(){
+      const items = Object.keys(menuIndex);
+      if(items.length===0){ alert('Chưa có menu để seed. Hãy nạp CSV trước.'); return; }
+      const pick = (n)=>{ const a=[...items]; a.sort(()=>Math.random()-0.5); return a.slice(0,n).map(name=>{ const info=menuIndex[name]; const s=info.sizes[0]||{size:'M',price:0}; return { name, size:s.size||'M', basePrice:s.price||0, qty:1, toppings:[], note:'', itemStatus:'queued', menuItemId:newId('mi') }; }); };
+      const o1 = { id:newId('ord'), type:'table', table:1, items: pick(3), status:'queued', createdAt: now()-600000, timeline:[{t:'queued',at:now()-600000}] };
+      const o2 = { id:newId('ord'), type:'table', table:2, items: pick(3), status:'queued', createdAt: now()-540000, timeline:[{t:'queued',at:now()-540000}] };
+      const o3 = { id:newId('ord'), type:'table', table:1, items: pick(1), status:'queued', createdAt: now()-480000, timeline:[{t:'queued',at:now()-480000}] };
+      const o4 = { id:newId('ord'), type:'takeaway', table:null, items: pick(2), status:'queued', createdAt: now()-420000, timeline:[{t:'queued',at:now()-420000}] };
+      await DB.push(o1); await DB.push(o2); await DB.push(o3); await DB.push(o4);
+    }
 
     async function refreshAll(){
       renderRole();
       if(role==='staff'){ renderStaff(); }
       if(role==='barista'){ await renderBarista(); }
       if(role==='cashier'){ await renderCashier(); }
-      if(role==='admin'){ els.tablesInput.value = cfg.tables; loadRevenueUI(); }
+      if(role==='admin'){ els.tablesInput.value = cfg.tables; renderCashier(); }
     }
 
     (async function init(){
-      // config
       els.tablesInput.value = cfg.tables;
-      // menu
       await loadMenuCSV();
-      // start
       await refreshAll();
-      toast('Sẵn sàng nhận order.');
+	  tintDropdowns();
+	  updateCartTitle();
+
     })();
   </script>
 
   <!-- === FIREBASE (optional) === -->
   <script type="module">
-    // Nếu muốn cloud realtime: điền cấu hình tại đây, hoặc xoá block này để chạy local hoàn toàn.
+    // Muốn dùng cloud realtime thì set cấu hình tại đây:
     // window.FIREBASE_CONFIG = { ... };
 
     if(window.FIREBASE_CONFIG){
@@ -950,101 +1174,74 @@ async function renderBarista(){
       import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
 
       const firebaseApi = {
-        ready:false, app:null, db:null, auth:null,
+        app:null, db:null, auth:null, user:null, ready:false,
         async init(){
-          try{
-            this.app = initializeApp(window.FIREBASE_CONFIG);
-            this.db = getDatabase(this.app);
-            this.auth = getAuth(this.app);
-            await signInAnonymously(this.auth);
-            this.ready = true;
-          }catch(e){ console.error('Firebase init error', e); this.ready=false; }
+          this.app = initializeApp(window.FIREBASE_CONFIG);
+          this.db = getDatabase(this.app);
+          this.auth = getAuth(this.app);
+          await signInAnonymously(this.auth);
+          this.ready = true;
         },
         ordersPath(){ const d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}); return `orders/${d}`; },
-        revenuePath(){ const d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}); return `revenue/${d}`; },
-
-        async listOrders(){
-          if(!this.ready) return [];
-          const snap = await get(ref(this.db,this.ordersPath()));
-          const val = snap.val()||{};
-          return Object.values(val).sort((a,b)=>a.createdAt-b.createdAt);
-        },
-        subscribeOrders(cb){
-          if(!this.ready) return;
-          onValue(ref(this.db,this.ordersPath()), (snap)=>{
-            const val=snap.val()||{}; const arr=Object.values(val).sort((a,b)=>a.createdAt-b.createdAt);
-            cb(arr);
-          });
-        },
+        async listOrders(){ const snap = await get(ref(this.db, this.ordersPath())); const val=snap.val()||{}; return Object.values(val).sort((a,b)=>a.createdAt-b.createdAt); },
         async pushOrder(order){
           if(!this.ready) return false;
-          const r = push(ref(this.db,this.ordersPath()));
-          await set(r,{...order,id:r.key});
-          // toast + beep
-          window.toast?.(`Có đơn mới: ${order.type==='takeaway'?'Mang về':'Bàn '+order.table} · ${order.items.length} món`); try{ const a=document.getElementById('ping'); a.currentTime=0; a.play(); }catch{}
+          const r = push(ref(this.db, this.ordersPath()));
+          await set(r, { ...order, id: r.key });
+          try{ window.notifyNewOrder?.(order); }catch{}
           return true;
         },
         async setItemStatus(orderId, idx, status){
           if(!this.ready) return false;
-          // fetch current
-          const snap = await get(ref(this.db,`${this.ordersPath()}/${orderId}`));
+          const orderRef = ref(this.db, this.ordersPath()+`/${orderId}`);
+          const snap = await get(orderRef);
           if(!snap.exists()) return false;
           const o = snap.val();
           o.items[idx].itemStatus = status;
-          if(o.items.every(it=>it.itemStatus==='delivered')) o.status='delivered';
-          await set(ref(this.db,`${this.ordersPath()}/${orderId}`), o);
+          if(o.items.every(x=>x.itemStatus==='delivered')) o.status='delivered';
+          await set(orderRef, o);
           return true;
         },
         async markPaidGroup(group){
           if(!this.ready) return false;
-          const snap = await get(ref(this.db,this.ordersPath()));
+          const snap = await get(ref(this.db, this.ordersPath()));
           const val = snap.val()||{};
-          let changed=false;
           for(const [id,o] of Object.entries(val)){
             if(o.status==='delivered' && ((group.type==='takeaway' && o.type==='takeaway') || (group.type==='table' && o.type==='table' && o.table===group.table))){
-              o.status='paid'; changed=true;
-              await set(ref(this.db,`${this.ordersPath()}/${id}`), o);
-              // record revenue
-              const amount = o.items.reduce((s,it)=> s + (it.basePrice + (it.toppings||[]).reduce((t,x)=>t+x.price,0))*it.qty, 0);
-              await set(ref(this.db,`${this.revenuePath()}/entries/${id}`), {
-                orderId: id,
-                tableOrTakeAway: o.type==='takeaway'?'Mang về':`Bàn ${o.table}`,
-                items: o.items.map(i=>({name:i.name,size:i.size,qty:i.qty})),
-                amount,
-                paidAt: new Date().toLocaleString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'})
-              });
-              // summary (simple accumulate)
-              const sumSnap = await get(ref(this.db,`${this.revenuePath()}/summary`));
-              const old = sumSnap.val()||{totalOrders:0,totalAmount:0};
-              await update(ref(this.db,`${this.revenuePath()}/summary`), {
-                totalOrders: (old.totalOrders||0)+1,
-                totalAmount: (old.totalAmount||0)+amount
-              });
+              o.status='paid';
+              await set(ref(this.db, this.ordersPath()+`/${id}`), o);
             }
           }
-          return changed;
-        },
-        async resetToday(){
-          if(!this.ready) return false;
-          await set(ref(this.db,this.ordersPath()), null);
-          await set(ref(this.db,this.revenuePath()), null);
           return true;
-        }
+        },
+        async resetToday(){ if(!this.ready) return false; await set(ref(this.db, this.ordersPath()), null); return true; }
       };
 
       await firebaseApi.init();
       window.firebaseApi = firebaseApi;
-
-      if(firebaseApi.ready){
-        firebaseApi.subscribeOrders(orders=>{
-          // keep local shadow for UI
-          // (UI always calls DB.list for fresh data)
-          document.getElementById('kpiOrders').textContent = String(orders.length);
-        });
-      }
-    } else {
-      // no Firebase config → local only
     }
   </script>
+  <audio id="soundBell" src="assets/sound/bell.mp3" preload="auto"></audio>
+<script>
+(function forceDesktopLikeView(){
+  const meta = document.querySelector('#metaViewport');
+  function apply() {
+    const w = Math.min(window.innerWidth || screen.width, screen.width || window.innerWidth);
+    if (w < 1200) {
+      // Ép layout theo desktop (giống "Trang cho máy tính")
+      meta.setAttribute('content', 'width=1280');
+      document.documentElement.classList.add('force-desktop');
+    } else {
+      // Trả về chế độ bình thường
+      meta.setAttribute('content', 'width=device-width, initial-scale=1.0');
+      document.documentElement.classList.remove('force-desktop');
+    }
+  }
+  window.addEventListener('resize', apply, {passive:true});
+  window.addEventListener('orientationchange', apply);
+  apply();
+})();
+</script>
+
 </body>
 </html>
